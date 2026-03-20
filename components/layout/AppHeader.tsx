@@ -9,7 +9,7 @@ type Props = {
 
 export default function AppHeader({ onMenuClick }: Props) {
   return (
-    <header className="h-14 shrink-0 flex items-center justify-between px-5 bg-white border-b border-mi-border z-20">
+    <header className="h-28 shrink-0 flex items-center justify-between px-5 bg-white border-b border-mi-border z-20">
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
@@ -18,13 +18,9 @@ export default function AppHeader({ onMenuClick }: Props) {
         >
           <Menu size={18} strokeWidth={1.5} />
         </button>
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-6 h-6 rounded-md bg-mi-primary flex items-center justify-center shrink-0">
-            <span className="text-white text-[10px] font-bold leading-none">RE</span>
-          </div>
-          <span className="font-semibold text-[15px] text-mi-text tracking-tight">
-            RE Intelligence
-          </span>
+        <Link href="/" className="flex items-center group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/Logo_RE.png" alt="RE Intelligence" style={{ height: 100, width: "auto", background: "transparent" }} />
         </Link>
       </div>
 

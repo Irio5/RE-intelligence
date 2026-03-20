@@ -110,7 +110,7 @@ export default function LandingPage() {
 
       {/* ── HERO ────────────────────────────────────────────────────────────── */}
       <section
-        className="relative min-h-screen flex flex-col items-center justify-start pt-[18vh] overflow-hidden"
+        className="relative min-h-screen flex flex-col items-center justify-start pt-[22vh] overflow-hidden"
         style={{
           backgroundImage: `url("/images/Brera_House.webp")`,
           // backgroundImage: `url("https://images.unsplash.com/photo-1534430480872-3498386e7856?auto=format&fit=crop&w=1920&q=80")`,
@@ -134,6 +134,12 @@ export default function LandingPage() {
           className="absolute inset-0"
           style={{ background: "rgba(180,130,90,0.08)", mixBlendMode: "multiply" }}
         />
+
+        {/* Top navbar with logo */}
+        <div className="absolute top-0 inset-x-0 z-20 flex justify-center py-6">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/Logo_RE.png" alt="RE Intelligence" style={{ height: 220, width: "auto", background: "transparent" }} />
+        </div>
 
         {/* Content */}
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
@@ -270,14 +276,8 @@ export default function LandingPage() {
       <section id="dashboard">
         {/* Dashboard mini-header */}
         <div className="h-14 bg-white border-b border-mi-border flex items-center px-5 sticky top-0 z-20">
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-md bg-mi-primary flex items-center justify-center">
-              <span className="text-white text-[10px] font-bold leading-none">RE</span>
-            </div>
-            <span className="font-semibold text-[15px] text-mi-text tracking-tight">
-              RE Intelligence
-            </span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/Logo_RE.png" alt="RE Intelligence" style={{ height: 80, width: "auto", background: "transparent" }} />
           <div className="ml-auto">
             <Link
               href="/trend"
@@ -313,12 +313,8 @@ export default function LandingPage() {
       {/* ── FOOTER ─────────────────────────────────────────────────────────── */}
       <footer className="bg-white border-t border-mi-border py-8 px-6">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-mi-primary flex items-center justify-center">
-              <span className="text-white text-[8px] font-bold leading-none">RE</span>
-            </div>
-            <span className="text-[13px] font-semibold text-mi-text">RE Intelligence</span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/Logo_RE.png" alt="RE Intelligence" style={{ height: 80, width: "auto", background: "transparent" }} />
           <p className="text-[12px] text-mi-subtle text-center">
             Dati OMI 2021–2025 · Solo Milano · Beta
           </p>
