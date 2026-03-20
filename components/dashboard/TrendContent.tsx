@@ -70,7 +70,7 @@ export default function TrendContent() {
   const [raw, setRaw] = useState<RawRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [zonaFiltro, setZonaFiltro] = useState(ZONE_ORDINATE[0]);
+  const [zonaFiltro, setZonaFiltro] = useState("C16");
 
   useEffect(() => {
     async function fetchAll() {
