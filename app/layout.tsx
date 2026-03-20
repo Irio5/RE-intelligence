@@ -1,22 +1,31 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { DM_Serif_Display, DM_Sans } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const dmSerif = DM_Serif_Display({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-serif",
+  display: "swap",
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "RE Intelligence",
-  description: "Dashboard di business intelligence sulle transazioni immobiliari reali a Milano",
+  title: "RE Intelligence — Analisi immobiliare Milano",
+  description: "Dashboard di business intelligence sulle transazioni immobiliari reali a Milano. Prezzi, trend, comparabili — dati, non opinioni.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="it" className={cn("font-sans", geist.variable)}>
+    <html lang="it" className={cn(dmSerif.variable, dmSans.variable)}>
       <body>{children}</body>
     </html>
   );

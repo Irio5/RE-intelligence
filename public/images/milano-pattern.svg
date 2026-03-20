@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900">
+  <defs>
+    <!-- Radial gradient to fade edges -->
+    <radialGradient id="fade" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#B84C2E" stop-opacity="1"/>
+      <stop offset="70%" stop-color="#B84C2E" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#B84C2E" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Center point: Milan Duomo (600, 450) -->
+
+  <!-- ── Concentric rings (cerchie) ── -->
+  <!-- Cerchia dei Navigli - innermost -->
+  <circle cx="600" cy="450" r="80"  fill="none" stroke="url(#fade)" stroke-width="1.2" opacity="0.9"/>
+  <!-- Cerchia dei Bastioni -->
+  <circle cx="600" cy="450" r="160" fill="none" stroke="url(#fade)" stroke-width="1.0" opacity="0.85"/>
+  <!-- Circonvallazione interna -->
+  <circle cx="600" cy="450" r="260" fill="none" stroke="url(#fade)" stroke-width="0.9" opacity="0.75"/>
+  <!-- Circonvallazione esterna -->
+  <circle cx="600" cy="450" r="380" fill="none" stroke="url(#fade)" stroke-width="0.8" opacity="0.6"/>
+  <!-- Tangenziale interna -->
+  <circle cx="600" cy="450" r="520" fill="none" stroke="url(#fade)" stroke-width="0.7" opacity="0.45"/>
+  <!-- Outer ring -->
+  <circle cx="600" cy="450" r="680" fill="none" stroke="url(#fade)" stroke-width="0.6" opacity="0.3"/>
+
+  <!-- ── Radial arteries (12 main roads from center) ── -->
+  <!-- Each line goes from center outward at 30° increments -->
+  <!-- 0° — Corso Buenos Aires direction (NE) -->
+  <line x1="600" y1="450" x2="1189" y2="111"  stroke="#B84C2E" stroke-width="1.0" opacity="0.5"/>
+  <!-- 30° -->
+  <line x1="600" y1="450" x2="1158" y2="125"  stroke="#B84C2E" stroke-width="0.8" opacity="0.35"/>
+  <!-- 60° — Corso Venezia direction -->
+  <line x1="600" y1="450" x2="1100" y2="111"  stroke="#B84C2E" stroke-width="1.0" opacity="0.5"/>
+  <!-- 90° — Via Montenapoleone direction -->
+  <line x1="600" y1="450" x2="1200" y2="450"  stroke="#B84C2E" stroke-width="0.8" opacity="0.35"/>
+  <!-- 120° -->
+  <line x1="600" y1="450" x2="1100" y2="789"  stroke="#B84C2E" stroke-width="1.0" opacity="0.5"/>
+  <!-- 150° -->
+  <line x1="600" y1="450" x2="760"  y2="900"  stroke="#B84C2E" stroke-width="0.8" opacity="0.35"/>
+  <!-- 180° — Corso di Porta Romana direction -->
+  <line x1="600" y1="450" x2="600"  y2="900"  stroke="#B84C2E" stroke-width="1.0" opacity="0.5"/>
+  <!-- 210° -->
+  <line x1="600" y1="450" x2="440"  y2="900"  stroke="#B84C2E" stroke-width="0.8" opacity="0.35"/>
+  <!-- 240° — Corso Genova direction -->
+  <line x1="600" y1="450" x2="100"  y2="789"  stroke="#B84C2E" stroke-width="1.0" opacity="0.5"/>
+  <!-- 270° — Via Dante direction -->
+  <line x1="600" y1="450" x2="0"    y2="450"  stroke="#B84C2E" stroke-width="0.8" opacity="0.35"/>
+  <!-- 300° — Corso Magenta direction -->
+  <line x1="600" y1="450" x2="100"  y2="111"  stroke="#B84C2E" stroke-width="1.0" opacity="0.5"/>
+  <!-- 330° -->
+  <line x1="600" y1="450" x2="440"  y2="0"    stroke="#B84C2E" stroke-width="0.8" opacity="0.35"/>
+  <!-- North — Corso Garibaldi direction -->
+  <line x1="600" y1="450" x2="600"  y2="0"    stroke="#B84C2E" stroke-width="1.0" opacity="0.5"/>
+
+  <!-- ── Secondary cross streets (grid overlay, lighter) ── -->
+  <!-- Horizontal grid lines -->
+  <line x1="0" y1="150" x2="1200" y2="150" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="0" y1="300" x2="1200" y2="300" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="0" y1="380" x2="1200" y2="380" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="0" y1="450" x2="1200" y2="450" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="0" y1="520" x2="1200" y2="520" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="0" y1="600" x2="1200" y2="600" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="0" y1="750" x2="1200" y2="750" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <!-- Vertical grid lines -->
+  <line x1="200"  y1="0" x2="200"  y2="900" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="380"  y1="0" x2="380"  y2="900" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="500"  y1="0" x2="500"  y2="900" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="600"  y1="0" x2="600"  y2="900" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="700"  y1="0" x2="700"  y2="900" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="820"  y1="0" x2="820"  y2="900" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+  <line x1="1000" y1="0" x2="1000" y2="900" stroke="#B84C2E" stroke-width="0.5" opacity="0.18"/>
+
+  <!-- ── Center dot (Duomo marker) ── -->
+  <circle cx="600" cy="450" r="4" fill="#B84C2E" opacity="0.7"/>
+  <circle cx="600" cy="450" r="8" fill="none" stroke="#B84C2E" stroke-width="0.8" opacity="0.5"/>
+  <circle cx="600" cy="450" r="14" fill="none" stroke="#B84C2E" stroke-width="0.6" opacity="0.3"/>
+</svg>

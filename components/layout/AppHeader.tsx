@@ -1,0 +1,41 @@
+"use client";
+
+import Link from "next/link";
+import { Menu } from "lucide-react";
+
+type Props = {
+  onMenuClick: () => void;
+};
+
+export default function AppHeader({ onMenuClick }: Props) {
+  return (
+    <header className="h-14 shrink-0 flex items-center justify-between px-5 bg-white border-b border-mi-border z-20">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden p-1.5 rounded-md text-mi-subtle hover:text-mi-text hover:bg-mi-hover transition-colors duration-150"
+          aria-label="Menu"
+        >
+          <Menu size={18} strokeWidth={1.5} />
+        </button>
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="w-6 h-6 rounded-md bg-mi-primary flex items-center justify-center shrink-0">
+            <span className="text-white text-[10px] font-bold leading-none">RE</span>
+          </div>
+          <span className="font-semibold text-[15px] text-mi-text tracking-tight">
+            RE Intelligence
+          </span>
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="hidden sm:inline text-sm text-mi-subtle px-3 py-1.5 rounded-lg hover:bg-mi-hover cursor-default transition-colors">
+          Milano
+        </span>
+        <div className="w-7 h-7 rounded-full bg-mi-hover border border-mi-border flex items-center justify-center text-[11px] font-semibold text-mi-muted cursor-default">
+          U
+        </div>
+      </div>
+    </header>
+  );
+}
