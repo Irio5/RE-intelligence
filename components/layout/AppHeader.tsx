@@ -9,18 +9,18 @@ type Props = {
 
 export default function AppHeader({ onMenuClick }: Props) {
   return (
-    <header className="h-28 shrink-0 flex items-center justify-between px-5 bg-white border-b border-mi-border z-20">
+    <header className="h-24 lg:h-28 shrink-0 flex items-center justify-between px-4 lg:px-5 bg-white border-b border-mi-border relative z-20">
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-1.5 rounded-md text-mi-subtle hover:text-mi-text hover:bg-mi-hover transition-colors duration-150"
+          className="lg:hidden p-2 rounded-md text-mi-subtle hover:text-mi-text hover:bg-mi-hover transition-colors duration-150 min-h-[44px] min-w-[44px] flex items-center justify-center"
           aria-label="Menu"
         >
-          <Menu size={18} strokeWidth={1.5} />
+          <Menu size={20} strokeWidth={1.5} />
         </button>
         <Link href="/" className="flex items-center group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Logo_RE.png" alt="RE Intelligence" style={{ height: 100, width: "auto", background: "transparent" }} />
+          <img src="/images/Logo_RE.png" alt="RE Intelligence" className="h-20 lg:h-24 w-auto" style={{ background: "transparent" }} />
         </Link>
       </div>
 

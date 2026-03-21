@@ -31,6 +31,7 @@ type RawRow = {
   metratura: string;
   prezzo: number;
   zonaOMI: string;
+  cat: string;
 };
 
 type Point = { x: number; y: number };
@@ -66,11 +67,34 @@ function computeTrend(points: Point[]): Point[] {
 
 const ZONE_ORDINATE = getAllZoneCodes();
 
+const selectStyle = {
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F6F6F' stroke-width='1.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat" as const,
+  backgroundPosition: "right 10px center",
+};
+
+const inputCls = "h-9 w-20 px-2.5 rounded-lg border border-mi-border bg-mi-card text-sm font-medium text-mi-text placeholder:text-mi-subtle focus:outline-none focus:ring-2 focus:ring-mi-primary/20 focus:border-mi-primary transition-colors";
+const selectCls = "h-9 px-3 pr-8 rounded-lg border border-mi-border bg-mi-card text-sm font-medium text-mi-text appearance-none focus:outline-none focus:ring-2 focus:ring-mi-primary/20 focus:border-mi-primary transition-colors duration-150 cursor-pointer";
+
 export default function TrendContent() {
   const [raw, setRaw] = useState<RawRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Mobile detection (< 768px)
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Filters
   const [zonaFiltro, setZonaFiltro] = useState("C16");
+  const [catFiltro,  setCatFiltro]  = useState("");   // "" = all categories
+  const [mqMin,      setMqMin]      = useState("");
+  const [mqMax,      setMqMax]      = useState("");
 
   useEffect(() => {
     async function fetchAll() {
@@ -80,7 +104,7 @@ export default function TrendContent() {
       while (true) {
         const { data, error } = await supabase
           .from("transazioni")
-          .select("attoid,anno,mese,metratura,prezzo,zonaOMI")
+          .select("attoid,anno,mese,metratura,prezzo,zonaOMI,cat")
           .range(page * PAGE, (page + 1) * PAGE - 1);
         if (error) { setErrorMsg(error.message); setLoading(false); return; }
         if (!data || data.length === 0) break;
@@ -88,8 +112,6 @@ export default function TrendContent() {
         if (data.length < PAGE) break;
         page++;
       }
-      const anniUnici = Array.from(new Set(all.map((r) => Number(r.anno)))).sort();
-      console.log("[trend] anni unici nel DB:", anniUnici);
       setRaw(all);
       setLoading(false);
     }
@@ -101,37 +123,68 @@ export default function TrendContent() {
     return Array.from(new Set([...ZONE_ORDINATE, ...dalDB])).sort();
   }, [raw]);
 
-  const { pointsReali, pointsStimati, trend, outlierCount, domainX } = useMemo(() => {
-    const filtrati = raw.filter((r) => r.zonaOMI === zonaFiltro);
-    const reali: Point[] = [];
-    const stimati: Point[] = [];
-    let outlierCount = 0;
-    const JITTER_MS = 10 * 24 * 60 * 60 * 1000;
+  const { pointsReali, pointsStimati, trend, outlierCount, domainX, yearTicks, categorieDisponibili } =
+    useMemo(() => {
+      // Available categories in this zone
+      const catSet = new Set<string>();
+      for (const r of raw) {
+        if (r.zonaOMI === zonaFiltro && r.cat) catSet.add(r.cat);
+      }
+      const categorieDisponibili = Array.from(catSet).sort();
 
-    for (const r of filtrati) {
-      const mq = parseMq(r.metratura);
-      if (!mq || mq <= 0) continue;
-      const eurMq = calcolaEuroMq(r.prezzo, mq);
-      if (eurMq < 500 || eurMq > 10000) { outlierCount++; continue; }
-      const anno = Number(r.anno);
-      const mese = Number(r.mese);
-      const baseX = new Date(anno, mese - 1).getTime();
-      const jitter = (Math.random() - 0.5) * 2 * JITTER_MS;
-      const point: Point = { x: baseX + jitter, y: eurMq };
-      if (isStimato(r.metratura)) stimati.push(point);
-      else reali.push(point);
-    }
+      const mqMinN = mqMin ? parseInt(mqMin) : null;
+      const mqMaxN = mqMax ? parseInt(mqMax) : null;
 
-    const allPoints = [...reali, ...stimati];
-    let minX = Infinity, maxX = -Infinity;
-    for (const p of allPoints) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-    }
-    const domainX: [number, number] = allPoints.length > 0 ? [minX, maxX] : [0, 1];
+      const reali: Point[] = [];
+      const stimati: Point[] = [];
+      let outlierCount = 0;
+      const JITTER_MS = 10 * 24 * 60 * 60 * 1000;
 
-    return { pointsReali: reali, pointsStimati: stimati, trend: computeTrend(allPoints), outlierCount, domainX };
-  }, [raw, zonaFiltro]);
+      for (const r of raw) {
+        if (r.zonaOMI !== zonaFiltro) continue;
+        if (catFiltro && r.cat !== catFiltro) continue;
+
+        const mq = parseMq(r.metratura);
+        if (!mq || mq <= 0) continue;
+        if (mqMinN !== null && mq < mqMinN) continue;
+        if (mqMaxN !== null && mq > mqMaxN) continue;
+
+        const eurMq = calcolaEuroMq(r.prezzo, mq);
+        if (eurMq < 500 || eurMq > 10000) { outlierCount++; continue; }
+
+        const anno = Number(r.anno);
+        const mese = Number(r.mese);
+        const baseX = new Date(anno, mese - 1).getTime();
+        const jitter = (Math.random() - 0.5) * 2 * JITTER_MS;
+        const point: Point = { x: baseX + jitter, y: eurMq };
+        if (isStimato(r.metratura)) stimati.push(point);
+        else reali.push(point);
+      }
+
+      const allPoints = [...reali, ...stimati];
+      let minX = Infinity, maxX = -Infinity;
+      for (const p of allPoints) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+      }
+      const domainX: [number, number] = allPoints.length > 0 ? [minX, maxX] : [0, 1];
+
+      // Explicit year ticks — always render on any screen width
+      const startYear = new Date(domainX[0]).getFullYear();
+      const endYear   = new Date(domainX[1]).getFullYear();
+      const yearTicks: number[] = [];
+      for (let y = startYear; y <= endYear; y++) yearTicks.push(new Date(y, 0).getTime());
+
+      return {
+        pointsReali: reali,
+        pointsStimati: stimati,
+        trend: computeTrend(allPoints),
+        outlierCount,
+        domainX,
+        yearTicks,
+        categorieDisponibili,
+      };
+    }, [raw, zonaFiltro, catFiltro, mqMin, mqMax]);
 
   const spiegazione = useMemo(() => {
     if (trend.length < 4) return null;
@@ -163,7 +216,7 @@ export default function TrendContent() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-[1100px] mx-auto">
+      <div className="p-4 md:p-8 max-w-[1100px] mx-auto">
         <PageHeader loading />
       </div>
     );
@@ -171,7 +224,7 @@ export default function TrendContent() {
 
   if (errorMsg) {
     return (
-      <div className="p-8 max-w-[1100px] mx-auto">
+      <div className="p-4 md:p-8 max-w-[1100px] mx-auto">
         <PageHeader />
         <div className="mt-6 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
           Errore: {errorMsg}
@@ -181,22 +234,20 @@ export default function TrendContent() {
   }
 
   return (
-    <div className="p-8 max-w-[1100px] mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-[1100px] mx-auto space-y-6">
       <PageHeader />
 
-      {/* Filter row */}
-      <div className="flex items-center gap-4">
+      {/* ── Filters — stacked on mobile, inline on desktop ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+
+        {/* Zona OMI */}
         <div className="flex items-center gap-2.5">
-          <label className="text-sm font-medium text-mi-muted whitespace-nowrap">
-            Zona OMI
-          </label>
+          <label className="text-sm font-medium text-mi-muted whitespace-nowrap">Zona OMI</label>
           <select
             value={zonaFiltro}
-            onChange={(e) => setZonaFiltro(e.target.value)}
-            className="h-9 px-3 pr-8 rounded-lg border border-mi-border bg-mi-card text-sm font-medium text-mi-text appearance-none
-                       focus:outline-none focus:ring-2 focus:ring-mi-primary/20 focus:border-mi-primary
-                       transition-colors duration-150 cursor-pointer"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F6F6F' stroke-width='1.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}
+            onChange={(e) => { setZonaFiltro(e.target.value); setCatFiltro(""); }}
+            className={selectCls}
+            style={selectStyle}
           >
             {zoneDisponibili.map((z) => (
               <option key={z} value={z}>{getZonaLabel(z)}</option>
@@ -204,49 +255,74 @@ export default function TrendContent() {
           </select>
         </div>
 
-        <span className="text-sm text-mi-subtle">
+        {/* Categoria catastale */}
+        <div className="flex items-center gap-2.5">
+          <label className="text-sm font-medium text-mi-muted whitespace-nowrap">Categoria</label>
+          <select
+            value={catFiltro}
+            onChange={(e) => setCatFiltro(e.target.value)}
+            className={selectCls}
+            style={selectStyle}
+          >
+            <option value="">Tutte</option>
+            {categorieDisponibili.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Metratura range */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-mi-muted whitespace-nowrap">Mq</label>
+          <input
+            type="number"
+            min={0}
+            placeholder="min"
+            value={mqMin}
+            onChange={(e) => setMqMin(e.target.value)}
+            className={inputCls}
+          />
+          <span className="text-sm text-mi-subtle">–</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="max"
+            value={mqMax}
+            onChange={(e) => setMqMax(e.target.value)}
+            className={inputCls}
+          />
+        </div>
+
+        <span className="text-sm text-mi-subtle sm:ml-2">
           {totale.toLocaleString("it-IT")} transazioni
         </span>
       </div>
 
-      {/* Chart card */}
-      <div className="bg-mi-card rounded-2xl border border-mi-border shadow-card p-6">
-        <ResponsiveContainer width="100%" height={420}>
-          <ComposedChart margin={{ top: 8, right: 16, bottom: 32, left: 56 }}>
-            <CartesianGrid
-              strokeDasharray="0"
-              stroke="#F0F0F0"
-              vertical={false}
-            />
+      {/* ── Chart card ── */}
+      <div className="bg-mi-card rounded-2xl border border-mi-border shadow-card p-3 md:p-6">
+        <div className="h-[350px] md:h-[420px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart margin={{ top: 8, right: 8, bottom: 48, left: 4 }}>
+            <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" vertical={false} />
             <XAxis
               type="number"
               dataKey="x"
               scale="time"
               domain={domainX}
-              tick={{ fontSize: 12, fill: "#9E9E9E", fontWeight: 400 }}
+              ticks={yearTicks}
+              tick={{ fontSize: 10, fill: "#9E9E9E", fontWeight: 400, angle: -45, textAnchor: "end", dy: 4 }}
               tickLine={false}
               axisLine={{ stroke: "#EBEBEB" }}
-              tickFormatter={(v) => {
-                const d = new Date(v);
-                if (d.getMonth() === 0) return String(d.getFullYear());
-                if (d.getMonth() === 6) return `lug ${d.getFullYear()}`;
-                return "";
-              }}
+              tickFormatter={(v) => String(new Date(v).getFullYear())}
             />
             <YAxis
               type="number"
               dataKey="y"
-              tick={{ fontSize: 12, fill: "#9E9E9E", fontWeight: 400 }}
+              width={42}
+              tick={{ fontSize: 11, fill: "#9E9E9E", fontWeight: 400 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-              label={{
-                value: "€/mq",
-                angle: -90,
-                position: "insideLeft",
-                offset: -40,
-                style: { fontSize: 12, fill: "#9E9E9E" },
-              }}
             />
             <Tooltip
               content={({ payload }) => {
@@ -268,25 +344,25 @@ export default function TrendContent() {
             <Legend
               verticalAlign="top"
               align="right"
-              wrapperStyle={{ fontSize: 12, color: "#9E9E9E", paddingBottom: 16 }}
+              wrapperStyle={{ fontSize: 11, color: "#9E9E9E", paddingBottom: 8 }}
               iconType="circle"
-              iconSize={8}
+              iconSize={7}
             />
 
             <Scatter
               name="mq reali"
-              data={pointsReali}
+              data={isMobile ? pointsReali.filter((_, i) => i % 3 === 0) : pointsReali}
               fill="#4A7C9E"
-              fillOpacity={0.3}
-              r={2.5}
+              fillOpacity={0.4}
+              r={2}
               isAnimationActive={false}
             />
             <Scatter
               name="mq stimati (da vani)"
-              data={pointsStimati}
+              data={isMobile ? pointsStimati.filter((_, i) => i % 3 === 0) : pointsStimati}
               fill="#D4A055"
-              fillOpacity={0.3}
-              r={2.5}
+              fillOpacity={0.4}
+              r={2}
               isAnimationActive={false}
             />
             <Line
@@ -294,7 +370,7 @@ export default function TrendContent() {
               dataKey="y"
               type="monotone"
               stroke="#C05A35"
-              strokeWidth={2}
+              strokeWidth={3}
               dot={false}
               name="media mobile"
               isAnimationActive={false}
@@ -302,23 +378,20 @@ export default function TrendContent() {
             />
           </ComposedChart>
         </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Notes */}
-      <div className="space-y-2">
-        {outlierCount > 0 && (
-          <div className="flex items-start gap-2.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-            <AlertTriangle size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" />
-            <span>
-              <strong>{outlierCount.toLocaleString("it-IT")}</strong> transazioni escluse
-              come outlier (€/mq &lt; 500 o &gt; 10.000 — probabili errori nei dati).
-            </span>
-          </div>
-        )}
-        <p className="text-[12px] text-mi-subtle">
-          * Punti ambra = metratura stimata (1 vano = 20 mq). La linea rossa mostra la media mobile mensile.
+      <p className="text-[12px] text-mi-subtle">
+        * Punti ambra = metratura stimata (1 vano = 20 mq). La linea rossa mostra la media mobile mensile.
+      </p>
+
+      {/* Mobile sampling note */}
+      {isMobile && totale > 0 && (
+        <p className="text-[11px] text-mi-subtle md:hidden">
+          Visualizzazione semplificata: mostrato 1 punto ogni 3 per leggibilità. Totale transazioni: {totale.toLocaleString("it-IT")}.
         </p>
-      </div>
+      )}
 
       {/* Explanatory text */}
       {spiegazione && (
@@ -327,6 +400,15 @@ export default function TrendContent() {
             Analisi
           </p>
           <p className="text-sm text-mi-muted leading-relaxed">{spiegazione}</p>
+        </div>
+      )}
+
+      {outlierCount > 0 && (
+        <div className="flex items-start gap-2.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <AlertTriangle size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+          <span>
+            <strong>{outlierCount.toLocaleString("it-IT")}</strong>{" "}transazioni escluse come outlier (€/mq &lt; 500 o &gt; 10.000 — probabili errori nei dati).
+          </span>
         </div>
       )}
     </div>

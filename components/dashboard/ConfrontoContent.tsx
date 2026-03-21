@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
-  PolarRadiusAxis, Tooltip, Legend, ResponsiveContainer,
+  PolarRadiusAxis, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { Scale, ChevronDown, X } from "lucide-react";
 import { parseMq, calcolaEuroMq } from "@/lib/utils/metratura";
@@ -427,9 +427,9 @@ export default function ConfrontoContent() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
-  if (loading)  return <div className="p-8 max-w-[1100px] mx-auto"><PageHeader loading /></div>;
+  if (loading)  return <div className="p-4 md:p-8 max-w-[1100px] mx-auto"><PageHeader loading /></div>;
   if (errorMsg) return (
-    <div className="p-8 max-w-[1100px] mx-auto">
+    <div className="p-4 md:p-8 max-w-[1100px] mx-auto">
       <PageHeader />
       <div className="mt-6 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">Errore: {errorMsg}</div>
     </div>
@@ -438,7 +438,7 @@ export default function ConfrontoContent() {
   const colorMap = Object.fromEntries(allStats.map((s, i) => [s.zona, PALETTE[i % PALETTE.length]]));
 
   return (
-    <div className="p-8 max-w-[1100px] mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-[1100px] mx-auto space-y-6">
       <PageHeader />
 
       {/* ── Zone selector + badges ── */}
@@ -527,12 +527,13 @@ export default function ConfrontoContent() {
             <p className="text-[12px] text-mi-subtle mb-5">
               100 = migliore nella categoria · "Convenienza" invertita (costo minore = punteggio maggiore) · Premium in € via coppie comparabili
             </p>
-            <ResponsiveContainer width="100%" height={380}>
+            <div className="h-[260px] md:h-[380px]">
+            <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={radarData} margin={{ top: 10, right: 40, bottom: 10, left: 40 }}>
                 <PolarGrid stroke="#EBEBEB" />
                 <PolarAngleAxis
                   dataKey="subject"
-                  tick={{ fontSize: 12, fill: "#6F6F6F", fontWeight: 500 }}
+                  tick={{ fontSize: 11, fill: "#6F6F6F", fontWeight: 500 }}
                 />
                 <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                 <Tooltip
@@ -550,13 +551,6 @@ export default function ConfrontoContent() {
                     );
                   }}
                 />
-                <Legend
-                  formatter={(value) => (
-                    <span style={{ color: colorMap[value] ?? "#666", fontSize: 12, fontWeight: 500 }}>
-                      {getZonaLabel(value)}
-                    </span>
-                  )}
-                />
                 {allStats.map((s, i) => (
                   <Radar
                     key={s.zona}
@@ -570,6 +564,22 @@ export default function ConfrontoContent() {
                 ))}
               </RadarChart>
             </ResponsiveContainer>
+            </div>
+
+            {/* Custom legend — below chart, no overlap */}
+            <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mt-4">
+              {allStats.map((s, i) => (
+                <div key={s.zona} className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PALETTE[i % PALETTE.length] }} />
+                  <span className="text-[12px] font-semibold" style={{ color: PALETTE[i % PALETTE.length] }}>
+                    {s.zona}
+                  </span>
+                  <span className="hidden sm:inline text-[12px] text-mi-muted">
+                    · {getZonaLabel(s.zona).split(" - ")[1] ?? ""}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* ── Explanation ── */}

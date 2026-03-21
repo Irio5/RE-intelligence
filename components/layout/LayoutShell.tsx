@@ -18,17 +18,18 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       {/* Main column */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <AppHeader onMenuClick={() => setSidebarOpen((v) => !v)} />
-        <main className="flex-1 overflow-y-auto relative bg-mi-bg">
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage: `url('/images/Milan_map.png')`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundAttachment: "fixed",
-              opacity: 0.35,
-            }}
-          />
+        {/* Fixed background — stays in place while content scrolls */}
+        <div
+          className="fixed inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `url('/images/Milan_map.png')`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            opacity: 0.35,
+            zIndex: 0,
+          }}
+        />
+        <main className="flex-1 overflow-y-auto relative" style={{ zIndex: 1 }}>
           <div className="relative z-10">{children}</div>
         </main>
       </div>

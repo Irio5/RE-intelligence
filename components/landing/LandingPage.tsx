@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, BarChart3, Target, TrendingUp, Map, Calculator, BarChart2, Warehouse, Scale, Tag, ArrowRight } from "lucide-react";
-import TrendContent from "@/components/dashboard/TrendContent";
+import { Search, BarChart3, Target, TrendingUp, Map, Calculator, BarChart2, Warehouse, Scale, Tag, ArrowRight, Menu, X } from "lucide-react";
+import MappaContent from "@/components/dashboard/MappaContent";
 
 // ─── Animated counter ────────────────────────────────────────────────────────
 
@@ -55,70 +55,107 @@ const NAV_ITEMS = [
   { href: "/mappa",         label: "Mappa prezzi",            icon: Map },
   { href: "/stima",         label: "Stima prezzo",            icon: Calculator },
   { href: "/distribuzione", label: "Distribuzione prezzi",    icon: BarChart2 },
-  { href: "/comps",         label: "Comps",                   icon: Search },
+  { href: "/comps",         label: "Transazioni Simili (Comps)", icon: Search },
   { href: "/premium",       label: "Premium garage/cantina",  icon: Warehouse },
   { href: "/confronto",     label: "Confronto zone",          icon: Scale },
   { href: "/categoria",     label: "Categoria catastale",     icon: Tag },
 ];
 
-function EmbeddedSidebar() {
+function EmbeddedSidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
 
   return (
-    <aside className="w-[240px] shrink-0 bg-white border-r border-mi-border flex flex-col">
-      <div className="h-14 flex items-center px-5 border-b border-mi-border">
-        <span className="text-[11px] font-semibold text-mi-subtle uppercase tracking-widest">
-          Funzionalità
-        </span>
-      </div>
-      <nav className="flex-1 overflow-y-auto p-2">
-        <ul className="space-y-0.5">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href || href === "/trend";
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className={[
-                    "group flex items-center gap-3 px-3 py-2.5 rounded-xl",
-                    "text-[13.5px] font-medium transition-all duration-150",
-                    isActive
-                      ? "bg-mi-active-bg text-mi-primary border-l-2 border-mi-primary pl-[10px]"
-                      : "text-mi-muted hover:bg-mi-hover hover:text-mi-text border-l-2 border-transparent pl-[10px]",
-                  ].join(" ")}
-                >
-                  <Icon size={15} strokeWidth={1.5} className={isActive ? "text-mi-primary" : "text-mi-subtle group-hover:text-mi-muted"} />
-                  {label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-      <div className="px-5 py-4 border-t border-mi-divider">
-        <p className="text-[11px] text-mi-subtle">Dati OMI · Milano · 2021–2025</p>
-      </div>
-    </aside>
+    <>
+      {/* Mobile backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] md:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        className={[
+          "bg-white border-r border-mi-border flex flex-col shrink-0",
+          isOpen
+            ? "fixed top-0 left-0 z-50 h-full w-[260px]"
+            : "hidden md:flex md:w-[240px]",
+        ].join(" ")}
+      >
+        <div className="h-14 flex items-center justify-between px-5 border-b border-mi-border">
+          <span className="text-[11px] font-semibold text-mi-subtle uppercase tracking-widest">
+            Funzionalità
+          </span>
+          <button
+            onClick={onClose}
+            className="md:hidden w-7 h-7 flex items-center justify-center rounded-md text-mi-subtle hover:text-mi-text hover:bg-mi-hover transition-colors"
+            aria-label="Chiudi menu"
+          >
+            <X size={14} strokeWidth={1.5} />
+          </button>
+        </div>
+        <nav className="flex-1 overflow-y-auto p-2">
+          <ul className="space-y-0.5">
+            {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href || href === "/mappa";
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    onClick={onClose}
+                    className={[
+                      "group flex items-center gap-3 px-3 py-2.5 rounded-xl",
+                      "text-[13.5px] font-medium transition-all duration-150",
+                      isActive
+                        ? "bg-mi-active-bg text-mi-primary border-l-2 border-mi-primary pl-[10px]"
+                        : "text-mi-muted hover:bg-mi-hover hover:text-mi-text border-l-2 border-transparent pl-[10px]",
+                    ].join(" ")}
+                  >
+                    <Icon size={15} strokeWidth={1.5} className={isActive ? "text-mi-primary" : "text-mi-subtle group-hover:text-mi-muted"} />
+                    {label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+        <div className="px-5 py-4 border-t border-mi-divider">
+          <p className="text-[11px] text-mi-subtle">Dati OMI · Milano · 2021–2025</p>
+        </div>
+      </aside>
+    </>
   );
 }
 
 // ─── Main landing page ────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
     <div className="bg-mi-bg font-sans">
 
       {/* ── HERO ────────────────────────────────────────────────────────────── */}
       <section
-        className="relative min-h-screen flex flex-col items-center justify-start pt-[22vh] overflow-hidden"
-        style={{
-          backgroundImage: `url("/images/Brera_House.webp")`,
-          // backgroundImage: `url("https://images.unsplash.com/photo-1534430480872-3498386e7856?auto=format&fit=crop&w=1920&q=80")`,
-          backgroundSize: "cover",
-          backgroundPosition: "center 10%",
-          filter: "none",
-        }}
+        className="relative min-h-screen flex flex-col items-center justify-start pt-[14vh] overflow-hidden"
       >
+        {/* Background — mobile */}
+        <div
+          className="absolute inset-0 md:hidden"
+          style={{
+            backgroundImage: `url("/images/Brera_House_Mobile.jpg")`,
+            backgroundSize: "140%",
+            backgroundPosition: "center top",
+          }}
+        />
+        {/* Background — desktop */}
+        <div
+          className="absolute inset-0 hidden md:block"
+          style={{
+            backgroundImage: `url("/images/Brera_House.webp")`,
+            backgroundSize: "cover",
+            backgroundPosition: "center 0%",
+          }}
+        />
         {/* Subtle uniform overlay for text legibility */}
         <div
           className="absolute inset-0"
@@ -138,14 +175,14 @@ export default function LandingPage() {
         {/* Top navbar with logo */}
         <div className="absolute top-0 inset-x-0 z-20 flex justify-center py-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Logo_RE.png" alt="RE Intelligence" style={{ height: 220, width: "auto", background: "transparent" }} />
+          <img src="/images/Logo_RE.png" alt="RE Intelligence" className="h-40 sm:h-44 md:h-[220px] w-auto" style={{ background: "transparent" }} />
         </div>
 
         {/* Content */}
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
           {/* Eyebrow */}
           <div
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-mi-border bg-white/70 backdrop-blur-sm text-[12px] font-medium text-mi-muted mb-8 animate-fade-in-up"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-mi-border bg-white/70 backdrop-blur-sm text-[12px] font-medium text-mi-muted mb-2 animate-fade-in-up mt-16"
             style={{ animationDelay: "0.05s" }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-mi-primary inline-block" />
@@ -154,7 +191,7 @@ export default function LandingPage() {
 
           {/* Headline */}
           <h1
-            className="font-display text-[52px] sm:text-[64px] leading-[1.05] text-mi-text mb-6 animate-fade-in-up"
+            className="font-display text-[36px] sm:text-[52px] leading-[1.05] text-mi-text mb-6 animate-fade-in-up"
             style={{ animationDelay: "0.15s" }}
           >
             Compra casa<br />
@@ -178,7 +215,7 @@ export default function LandingPage() {
           >
             <a
               href="#dashboard"
-              className="inline-flex items-center gap-2 h-12 px-7 rounded-xl bg-mi-primary text-white text-[15px] font-semibold
+              className="inline-flex items-center justify-center gap-2 h-12 px-7 w-full sm:w-auto rounded-xl bg-mi-primary text-white text-[15px] font-semibold
                          hover:bg-mi-primary-dark transition-colors duration-150 shadow-card-md"
             >
               Inizia l&apos;analisi
@@ -186,7 +223,7 @@ export default function LandingPage() {
             </a>
             <a
               href="#come-funziona"
-              className="inline-flex items-center gap-2 h-12 px-6 rounded-xl border border-mi-border bg-white/70 backdrop-blur-sm
+              className="inline-flex items-center justify-center gap-2 h-12 px-6 w-full sm:w-auto rounded-xl border border-mi-border bg-white/70 backdrop-blur-sm
                          text-[15px] font-medium text-mi-muted hover:bg-white hover:text-mi-text transition-all duration-150"
             >
               Come funziona
@@ -275,13 +312,23 @@ export default function LandingPage() {
       {/* ── DASHBOARD SECTION ─────────────────────────────────────────────────── */}
       <section id="dashboard">
         {/* Dashboard mini-header */}
-        <div className="h-14 bg-white border-b border-mi-border flex items-center px-5 sticky top-0 z-20">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Logo_RE.png" alt="RE Intelligence" style={{ height: 80, width: "auto", background: "transparent" }} />
+        <div className="h-24 bg-white border-b border-mi-border flex items-center px-4 sm:px-5 sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            {/* Hamburger — mobile only */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-2 rounded-md text-mi-subtle hover:text-mi-text hover:bg-mi-hover transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Menu"
+            >
+              <Menu size={19} strokeWidth={1.5} />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/Logo_RE.png" alt="RE Intelligence" className="h-20 sm:h-[80px] w-auto" style={{ background: "transparent" }} />
+          </div>
           <div className="ml-auto">
             <Link
               href="/trend"
-              className="text-[13px] font-medium text-mi-muted hover:text-mi-primary transition-colors duration-150 flex items-center gap-1.5"
+              className="hidden md:flex text-[13px] font-medium text-mi-muted hover:text-mi-primary transition-colors duration-150 items-center gap-1.5"
             >
               Apri a schermo intero
               <ArrowRight size={13} strokeWidth={1.5} />
@@ -290,8 +337,8 @@ export default function LandingPage() {
         </div>
 
         {/* Dashboard body: sidebar + content */}
-        <div className="flex" style={{ minHeight: "calc(100vh - 56px)" }}>
-          <EmbeddedSidebar />
+        <div className="flex" style={{ minHeight: "calc(100vh - 96px)" }}>
+          <EmbeddedSidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
           <div className="flex-1 min-w-0 overflow-x-auto relative bg-mi-bg">
             <div
               className="absolute inset-0 pointer-events-none"
@@ -304,7 +351,7 @@ export default function LandingPage() {
               }}
             />
             <div className="relative z-10">
-              <TrendContent />
+              <MappaContent />
             </div>
           </div>
         </div>
@@ -314,7 +361,7 @@ export default function LandingPage() {
       <footer className="bg-white border-t border-mi-border py-8 px-6">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Logo_RE.png" alt="RE Intelligence" style={{ height: 80, width: "auto", background: "transparent" }} />
+          <img src="/images/Logo_RE.png" alt="RE Intelligence" className="h-20 sm:h-[80px] w-auto" style={{ background: "transparent" }} />
           <p className="text-[12px] text-mi-subtle text-center">
             Dati OMI 2021–2025 · Solo Milano · Beta
           </p>

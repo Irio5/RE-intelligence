@@ -441,13 +441,13 @@ export default function StimaContent() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) return (
-    <div className="p-8 max-w-[900px] mx-auto">
+    <div className="p-4 md:p-8 max-w-[900px] mx-auto">
       <PageHeader loading />
     </div>
   );
 
   if (errorMsg) return (
-    <div className="p-8 max-w-[900px] mx-auto">
+    <div className="p-4 md:p-8 max-w-[900px] mx-auto">
       <PageHeader />
       <div className="mt-6 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
         Errore: {errorMsg}
@@ -462,7 +462,7 @@ export default function StimaContent() {
     : 1;
 
   return (
-    <div className="p-8 max-w-[900px] mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-[900px] mx-auto space-y-6">
       <PageHeader />
 
       {/* ── Form card ── */}

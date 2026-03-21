@@ -252,11 +252,11 @@ export default function DistribuzioneContent() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (loading) return (
-    <div className="p-8 max-w-[1100px] mx-auto"><PageHeader loading /></div>
+    <div className="p-4 md:p-8 max-w-[1100px] mx-auto"><PageHeader loading /></div>
   );
 
   if (errorMsg) return (
-    <div className="p-8 max-w-[1100px] mx-auto">
+    <div className="p-4 md:p-8 max-w-[1100px] mx-auto">
       <PageHeader />
       <div className="mt-6 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
         Errore: {errorMsg}
@@ -271,7 +271,7 @@ export default function DistribuzioneContent() {
   };
 
   return (
-    <div className="p-8 max-w-[1100px] mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-[1100px] mx-auto space-y-6">
       <PageHeader />
 
       {/* ── Filters ── */}
@@ -327,7 +327,8 @@ export default function DistribuzioneContent() {
             )}
           </div>
 
-          <ResponsiveContainer width="100%" height={400}>
+          <div className="h-[260px] md:h-[400px]">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={buckets}
               margin={{ top: 24, right: 20, bottom: 36, left: 16 }}
@@ -413,6 +414,7 @@ export default function DistribuzioneContent() {
               )}
             </BarChart>
           </ResponsiveContainer>
+          </div>
 
           {/* Band labels */}
           <div className="flex items-center justify-between mt-3 px-1 text-[11px] text-mi-subtle">
@@ -429,15 +431,6 @@ export default function DistribuzioneContent() {
       )}
 
       {/* ── Notes ── */}
-      {outlierCount > 0 && (
-        <div className="flex items-start gap-2.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <AlertTriangle size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" />
-          <span>
-            <strong>{outlierCount.toLocaleString("it-IT")}</strong> transazioni escluse come outlier
-            (€/mq &lt; 500 o &gt; 10.000 — probabili errori nei dati).
-          </span>
-        </div>
-      )}
       <p className="text-[12px] text-mi-subtle">
         * I bucket sono fasce di 200 €/mq. Le linee verticali indicano i percentili calcolati sull&apos;intera distribuzione della zona.
       </p>
@@ -447,6 +440,15 @@ export default function DistribuzioneContent() {
         <div className="bg-mi-card border border-mi-border rounded-2xl p-6 shadow-card">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-mi-subtle mb-2">Analisi</p>
           <p className="text-sm text-mi-muted leading-relaxed">{spiegazione}</p>
+        </div>
+      )}
+
+      {outlierCount > 0 && (
+        <div className="flex items-start gap-2.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <AlertTriangle size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+          <span>
+            <strong>{outlierCount.toLocaleString("it-IT")}</strong>{" "}transazioni escluse come outlier (€/mq &lt; 500 o &gt; 10.000 — probabili errori nei dati).
+          </span>
         </div>
       )}
     </div>

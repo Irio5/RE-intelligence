@@ -12,7 +12,7 @@ export const NAV_ITEMS = [
   { href: "/mappa",         label: "Mappa prezzi",            icon: Map },
   { href: "/stima",         label: "Stima prezzo",            icon: Calculator },
   { href: "/distribuzione", label: "Distribuzione prezzi",    icon: BarChart2 },
-  { href: "/comps",         label: "Comps",                   icon: Search },
+  { href: "/comps",         label: "Transazioni Simili (Comps)", icon: Search },
   { href: "/premium",       label: "Premium garage/cantina",  icon: Warehouse },
   { href: "/confronto",     label: "Confronto zone",          icon: Scale },
   { href: "/categoria",     label: "Categoria catastale",     icon: Tag },
@@ -30,7 +30,7 @@ export default function AppSidebar({ isOpen, onClose }: Props) {
     <>
       {isOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/15 backdrop-blur-[2px] lg:hidden"
+          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-[2px] lg:hidden"
           onClick={onClose}
         />
       )}
@@ -40,7 +40,7 @@ export default function AppSidebar({ isOpen, onClose }: Props) {
           "fixed top-0 left-0 z-40 h-full w-[260px] flex flex-col",
           "bg-white border-r border-mi-border",
           "transform transition-transform duration-200 ease-in-out",
-          "lg:relative lg:translate-x-0 lg:z-auto",
+          "lg:relative lg:translate-x-0 lg:z-10",
           isOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
       >

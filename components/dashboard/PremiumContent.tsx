@@ -348,16 +348,16 @@ export default function PremiumContent() {
     backgroundPosition: "right 10px center",
   };
 
-  if (loading)  return <div className="p-8 max-w-[900px] mx-auto"><PageHeader loading /></div>;
+  if (loading)  return <div className="p-4 md:p-8 max-w-[900px] mx-auto"><PageHeader loading /></div>;
   if (errorMsg) return (
-    <div className="p-8 max-w-[900px] mx-auto">
+    <div className="p-4 md:p-8 max-w-[900px] mx-auto">
       <PageHeader />
       <div className="mt-6 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">Errore: {errorMsg}</div>
     </div>
   );
 
   return (
-    <div className="p-8 max-w-[900px] mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-[900px] mx-auto space-y-6">
       <PageHeader />
 
       {/* ── Filter ── */}
@@ -382,7 +382,8 @@ export default function PremiumContent() {
           <p className="text-[11px] font-semibold text-mi-subtle uppercase tracking-widest mb-4">
             Premium assoluto in €
           </p>
-          <ResponsiveContainer width="100%" height={280}>
+          <div className="h-[220px] md:h-[280px]">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 36, right: 20, bottom: 8, left: 16 }} barCategoryGap="40%">
               <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" vertical={false} />
               <XAxis
@@ -406,16 +407,7 @@ export default function PremiumContent() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* ── Warnings ── */}
-      {outlierCount > 0 && (
-        <div className="flex items-start gap-2.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <AlertTriangle size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" />
-          <span>
-            <strong>{outlierCount.toLocaleString("it-IT")}</strong> transazioni escluse come outlier (€/mq &lt; 500 o &gt; 10.000).
-          </span>
+          </div>
         </div>
       )}
 
@@ -424,6 +416,15 @@ export default function PremiumContent() {
         <div className="bg-mi-card border border-mi-border rounded-2xl p-6 shadow-card">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-mi-subtle mb-2">Analisi</p>
           <p className="text-sm text-mi-muted leading-relaxed">{spiegazione}</p>
+        </div>
+      )}
+
+      {outlierCount > 0 && (
+        <div className="flex items-start gap-2.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <AlertTriangle size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+          <span>
+            <strong>{outlierCount.toLocaleString("it-IT")}</strong>{" "}transazioni escluse come outlier (€/mq &lt; 500 o &gt; 10.000).
+          </span>
         </div>
       )}
     </div>
