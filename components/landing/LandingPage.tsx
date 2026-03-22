@@ -180,19 +180,10 @@ export default function LandingPage() {
 
         {/* Content */}
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
-          {/* Eyebrow */}
-          <div
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-mi-border bg-white/70 backdrop-blur-sm text-[12px] font-medium text-mi-muted mb-2 animate-fade-in-up mt-16 md:mt-0"
-            style={{ animationDelay: "0.05s" }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-mi-primary inline-block" />
-            Analisi basata su dati OMI reali · Milano
-          </div>
-
           {/* Headline */}
           <h1
-            className="font-display text-[36px] sm:text-[52px] leading-[1.05] text-mi-text mb-6 animate-fade-in-up"
-            style={{ animationDelay: "0.15s" }}
+            className="font-display text-[36px] sm:text-[52px] leading-[1.05] text-mi-text mb-3 animate-fade-in-up mt-16 md:mt-0"
+            style={{ animationDelay: "0.1s" }}
           >
             Compra casa<br />
             <span className="text-mi-primary">al prezzo giusto</span>
@@ -200,8 +191,8 @@ export default function LandingPage() {
 
           {/* Subtitle */}
           <p
-            className="text-[17px] sm:text-[19px] text-mi-muted leading-relaxed mb-10 max-w-xl mx-auto animate-fade-in-up"
-            style={{ animationDelay: "0.28s" }}
+            className="text-[17px] sm:text-[19px] text-mi-muted leading-relaxed mb-6 max-w-xl mx-auto animate-fade-in-up"
+            style={{ animationDelay: "0.22s" }}
           >
             Analisi basata su 18.000+ transazioni reali a Milano.
             Prezzi, trend, comparabili —{" "}
