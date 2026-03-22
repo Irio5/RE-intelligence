@@ -136,7 +136,7 @@ export default function LandingPage() {
 
       {/* ── HERO ────────────────────────────────────────────────────────────── */}
       <section
-        className="relative min-h-screen flex flex-col items-center justify-start pt-[14vh] overflow-hidden"
+        className="relative min-h-screen flex flex-col items-center justify-start pt-[14vh] md:pt-[260px] overflow-hidden"
       >
         {/* Background — mobile */}
         <div
@@ -152,7 +152,7 @@ export default function LandingPage() {
           className="absolute inset-0 hidden md:block"
           style={{
             backgroundImage: `url("/images/Brera_House.webp")`,
-            backgroundSize: "cover",
+            backgroundSize: "60%",
             backgroundPosition: "center 0%",
           }}
         />
@@ -182,7 +182,7 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
           {/* Eyebrow */}
           <div
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-mi-border bg-white/70 backdrop-blur-sm text-[12px] font-medium text-mi-muted mb-2 animate-fade-in-up mt-16"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-mi-border bg-white/70 backdrop-blur-sm text-[12px] font-medium text-mi-muted mb-2 animate-fade-in-up mt-16 md:mt-0"
             style={{ animationDelay: "0.05s" }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-mi-primary inline-block" />
