@@ -136,7 +136,7 @@ export default function LandingPage() {
 
       {/* ── HERO ────────────────────────────────────────────────────────────── */}
       <section
-        className="relative min-h-screen flex flex-col items-center justify-start pt-[8vh] md:pt-[236px] overflow-hidden"
+        className="relative min-h-screen flex flex-col items-center justify-start pt-[188px] sm:pt-[200px] md:pt-[236px] overflow-hidden"
       >
         {/* Background — mobile */}
         <div
@@ -182,7 +182,7 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
           {/* Headline */}
           <h1
-            className="font-display text-[36px] sm:text-[52px] leading-[1.05] text-mi-text mb-3 animate-fade-in-up mt-10 md:mt-0"
+            className="font-display text-[36px] sm:text-[52px] leading-[1.05] text-mi-text mb-3 animate-fade-in-up"
             style={{ animationDelay: "0.1s" }}
           >
             Compra casa<br />
