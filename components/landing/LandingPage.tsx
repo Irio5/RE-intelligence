@@ -136,7 +136,7 @@ export default function LandingPage() {
 
       {/* ── HERO ────────────────────────────────────────────────────────────── */}
       <section
-        className="relative min-h-screen flex flex-col items-center justify-start pt-[14vh] md:pt-[260px] overflow-hidden"
+        className="relative min-h-screen flex flex-col items-center justify-start pt-[8vh] md:pt-[236px] overflow-hidden"
       >
         {/* Background — mobile */}
         <div
@@ -152,7 +152,7 @@ export default function LandingPage() {
           className="absolute inset-0 hidden md:block"
           style={{
             backgroundImage: `url("/images/Brera_House.webp")`,
-            backgroundSize: "150%",
+            backgroundSize: "120%",
             backgroundPosition: "center 0%",
           }}
         />
@@ -173,7 +173,7 @@ export default function LandingPage() {
         />
 
         {/* Top navbar with logo */}
-        <div className="absolute top-0 inset-x-0 z-20 flex justify-center py-6">
+        <div className="absolute top-0 inset-x-0 z-20 flex justify-center py-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/images/Logo_RE.png" alt="RE Intelligence" className="h-40 sm:h-44 md:h-[220px] w-auto" style={{ background: "transparent" }} />
         </div>
@@ -182,7 +182,7 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
           {/* Headline */}
           <h1
-            className="font-display text-[36px] sm:text-[52px] leading-[1.05] text-mi-text mb-3 animate-fade-in-up mt-16 md:mt-0"
+            className="font-display text-[36px] sm:text-[52px] leading-[1.05] text-mi-text mb-3 animate-fade-in-up mt-10 md:mt-0"
             style={{ animationDelay: "0.1s" }}
           >
             Compra casa<br />
