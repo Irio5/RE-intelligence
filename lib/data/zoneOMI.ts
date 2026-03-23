@@ -65,3 +65,12 @@ export function getZonaLabel(codice: string): string {
 export function getAllZoneCodes(): string[] {
   return Object.keys(ZONE_OMI).sort();
 }
+
+/**
+ * Merges known OMI codes with any extra codes found in raw data rows,
+ * returning a deduplicated sorted list. Used by all dashboard zone selectors.
+ */
+export function buildZoneList(raw: { zonaOMI: string }[]): string[] {
+  const fromDB = new Set(raw.map(r => r.zonaOMI));
+  return Array.from(new Set([...getAllZoneCodes(), ...fromDB])).sort();
+}

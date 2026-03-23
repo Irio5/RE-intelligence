@@ -7,10 +7,12 @@ import {
 } from "recharts";
 import { Scale, ChevronDown, X } from "lucide-react";
 import { parseMq, calcolaEuroMq } from "@/lib/utils/metratura";
-import { getZonaLabel, getAllZoneCodes } from "@/lib/data/zoneOMI";
-import { supabase } from "@/lib/supabase";
+import { getZonaLabel, buildZoneList } from "@/lib/data/zoneOMI";
+import { fetchAllPages } from "@/lib/utils/fetchAllPages";
+import { calcPercentile, fmt, fmtEur } from "@/lib/utils/stats";
+import { hasAcc } from "@/lib/utils/accessori";
+import { AnalysisCard } from "@/components/dashboard/AnalysisCard";
 
-const ZONE_ORDINATE = getAllZoneCodes();
 const MAX_ZONES = 5;
 const DEFAULT_ZONES = ["C15", "C16", "C17"];
 const PALETTE = ["#B84C2E", "#D4A055", "#4A7C9E", "#22C55E", "#8B5CF6"];
@@ -45,37 +47,10 @@ type ZoneStats = {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-function hasAcc(v: string | boolean | null | undefined): boolean {
-  return v !== false && v !== "FALSE" && v !== "false" && v != null && v !== "";
-}
-
-function calcPercentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = (p / 100) * (sorted.length - 1);
-  const lo = Math.floor(idx), hi = Math.ceil(idx);
-  if (lo === hi) return sorted[lo];
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
-}
-
 function normalize(value: number, min: number, max: number, invert = false): number {
   if (max === min) return 50;
   const n = ((value - min) / (max - min)) * 100;
   return Math.round(invert ? 100 - n : n);
-}
-
-function fmt(n: number) { return Math.round(n).toLocaleString("it-IT"); }
-
-function fmtK(n: number): string {
-  if (n >= 1000) return `€\u202f${Math.round(n).toLocaleString("it-IT")}`;
-  return `€\u202f${Math.round(n)}`;
-}
-
-function calcPercentileSorted(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = (p / 100) * (sorted.length - 1);
-  const lo = Math.floor(idx), hi = Math.ceil(idx);
-  if (lo === hi) return sorted[lo];
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
 }
 
 function computeMatchedPremium(
@@ -97,7 +72,7 @@ function computeMatchedPremium(
   }
   if (diffs.length < MIN_PAIRS) return { median: null, nPairs: diffs.length };
   const sorted = [...diffs].sort((a, b) => a - b);
-  const m = calcPercentileSorted(sorted, 50);
+  const m = calcPercentile(sorted, 50);
   return { median: Math.max(0, Math.round(m)), nPairs: diffs.length };
 }
 
@@ -124,21 +99,21 @@ function computeZoneStats(rows: RawRow[], zona: string): ZoneStats | null {
 
   if (vals.length < 3) return null;
 
-  const eurMqs  = vals.map(v => v.eurMq);
-  const sorted  = [...eurMqs].sort((a, b) => a - b);
-  const mean    = eurMqs.reduce((s, v) => s + v, 0) / eurMqs.length;
-  const median  = calcPercentile(sorted, 50);
-  const volEur  = vals.reduce((s, v) => s + v.prezzo, 0);
+  const eurMqs = vals.map(v => v.eurMq);
+  const sorted = [...eurMqs].sort((a, b) => a - b);
+  const mean   = eurMqs.reduce((s, v) => s + v, 0) / eurMqs.length;
+  const median = calcPercentile(sorted, 50);
+  const volEur = vals.reduce((s, v) => s + v.prezzo, 0);
 
   // Trend: first 25% of dates vs last 25%
-  const byDate  = [...vals].sort((a, b) => a.annoMese - b.annoMese);
+  const byDate = [...vals].sort((a, b) => a.annoMese - b.annoMese);
   let trendPct: number | null = null;
   if (byDate.length >= 8) {
     const n     = Math.max(3, Math.floor(byDate.length * 0.25));
     const early = byDate.slice(0, n).map(v => v.eurMq);
     const late  = byDate.slice(-n).map(v => v.eurMq);
     const eM    = early.reduce((s, v) => s + v, 0) / early.length;
-    const lM    = late.reduce((s, v) => s + v, 0) / late.length;
+    const lM    = late.reduce((s, v)  => s + v, 0) / late.length;
     trendPct    = Math.round(((lM - eM) / eM) * 100);
   }
 
@@ -146,11 +121,10 @@ function computeZoneStats(rows: RawRow[], zona: string): ZoneStats | null {
   for (const v of vals) catCount.set(v.cat, (catCount.get(v.cat) ?? 0) + 1);
   const catPrev = Array.from(catCount.entries()).sort(([,a],[,b]) => b - a)[0]?.[0] ?? "—";
 
-  // Premium garage / cantina via matching comparables
   const toRow = (v: V): ProcessedRow => ({ mq: v.mq, eurMq: v.eurMq, prezzo: v.prezzo, cat: v.cat });
-  const none    = vals.filter(v => !v.garage && !v.cantina).map(toRow);
-  const gOnly   = vals.filter(v =>  v.garage && !v.cantina).map(toRow);
-  const cOnly   = vals.filter(v => !v.garage &&  v.cantina).map(toRow);
+  const none   = vals.filter(v => !v.garage && !v.cantina).map(toRow);
+  const gOnly  = vals.filter(v =>  v.garage && !v.cantina).map(toRow);
+  const cOnly  = vals.filter(v => !v.garage &&  v.cantina).map(toRow);
   const { median: premiumGarage  } = computeMatchedPremium(gOnly, none);
   const { median: premiumCantina } = computeMatchedPremium(cOnly, none);
 
@@ -259,55 +233,35 @@ function PageHeader({ loading }: { loading?: boolean }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ConfrontoContent() {
-  const [raw, setRaw]             = useState<RawRow[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [errorMsg, setErrorMsg]   = useState<string | null>(null);
-  const [selected, setSelected]   = useState<string[]>(DEFAULT_ZONES);
+  const [raw, setRaw]           = useState<RawRow[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>(DEFAULT_ZONES);
 
   useEffect(() => {
-    async function fetchAll() {
-      const PAGE = 1000;
-      let all: RawRow[] = [];
-      let page = 0;
-      while (true) {
-        const { data, error } = await supabase
-          .from("transazioni")
-          .select("anno,mese,metratura,prezzo,zonaOMI,cat,garage,cantina")
-          .range(page * PAGE, (page + 1) * PAGE - 1);
-        if (error) { setErrorMsg(error.message); setLoading(false); return; }
-        if (!data || data.length === 0) break;
-        all = all.concat(data as RawRow[]);
-        if (data.length < PAGE) break;
-        page++;
-      }
-      setRaw(all);
-      setLoading(false);
-    }
-    fetchAll();
+    fetchAllPages<RawRow>("transazioni", "anno,mese,metratura,prezzo,zonaOMI,cat,garage,cantina")
+      .then(({ data, error }) => {
+        if (error) setErrorMsg(error);
+        else setRaw(data);
+        setLoading(false);
+      });
   }, []);
 
-  const zoneDisponibili = useMemo(() => {
-    const dalDB = new Set(raw.map(r => r.zonaOMI));
-    return Array.from(new Set([...ZONE_ORDINATE, ...dalDB])).sort();
-  }, [raw]);
+  const zoneDisponibili = useMemo(() => buildZoneList(raw), [raw]);
 
   function toggleZone(z: string) {
     setSelected(prev =>
       prev.includes(z)
-        ? prev.length > 2 ? prev.filter(x => x !== z) : prev  // keep min 2
+        ? prev.length > 2 ? prev.filter(x => x !== z) : prev
         : prev.length < MAX_ZONES ? [...prev, z] : prev
     );
   }
-
-  // ── Stats per zone ──────────────────────────────────────────────────────────
 
   const allStats: ZoneStats[] = useMemo(() =>
     selected
       .map(z => computeZoneStats(raw, z))
       .filter((s): s is ZoneStats => s !== null),
   [raw, selected]);
-
-  // ── Radar data ──────────────────────────────────────────────────────────────
 
   const radarData = useMemo(() => {
     if (allStats.length < 2) return [];
@@ -324,11 +278,11 @@ export default function ConfrontoContent() {
     const cantinaE = ext(s => s.premiumCantina ?? 0);
 
     const axes = [
-      { subject: "Convenienza",   fn: (s: ZoneStats) => normalize(s.medianEurMq,          priceE.min,   priceE.max,   true)  },
-      { subject: "Trend",         fn: (s: ZoneStats) => normalize(s.trendPct ?? 0,         trendE.min,   trendE.max)          },
-      { subject: "Volume (€)",    fn: (s: ZoneStats) => normalize(s.volEur,                volE.min,     volE.max)            },
-      { subject: "Prm. Garage",   fn: (s: ZoneStats) => normalize(s.premiumGarage  ?? 0,  garageE.min,  garageE.max)         },
-      { subject: "Prm. Cantina",  fn: (s: ZoneStats) => normalize(s.premiumCantina ?? 0,  cantinaE.min, cantinaE.max)        },
+      { subject: "Convenienza",  fn: (s: ZoneStats) => normalize(s.medianEurMq,         priceE.min,   priceE.max,   true) },
+      { subject: "Trend",        fn: (s: ZoneStats) => normalize(s.trendPct ?? 0,        trendE.min,   trendE.max)         },
+      { subject: "Volume (€)",   fn: (s: ZoneStats) => normalize(s.volEur,               volE.min,     volE.max)           },
+      { subject: "Prm. Garage",  fn: (s: ZoneStats) => normalize(s.premiumGarage  ?? 0, garageE.min,  garageE.max)        },
+      { subject: "Prm. Cantina", fn: (s: ZoneStats) => normalize(s.premiumCantina ?? 0, cantinaE.min, cantinaE.max)       },
     ];
 
     return axes.map(({ subject, fn }) => {
@@ -337,8 +291,6 @@ export default function ConfrontoContent() {
       return row;
     });
   }, [allStats]);
-
-  // ── Table metric rows ───────────────────────────────────────────────────────
 
   type MetricDef = {
     label: string;
@@ -356,14 +308,14 @@ export default function ConfrontoContent() {
       highlightColor: "green" | "red",
       label: string,
       num: (s: ZoneStats) => number | null,
-      fmt: (v: number | null) => string,
+      format: (v: number | null) => string,
     ): MetricDef => ({
       label,
       values:        allStats.map(s => num(s)),
       numericValues: allStats.map(s => num(s)),
       better,
       highlightColor,
-      format: fmt,
+      format,
     });
     const volFmt = (v: number | null) => {
       if (v == null) return "—";
@@ -372,21 +324,19 @@ export default function ConfrontoContent() {
       return `${fmt(v)} €`;
     };
     return [
-      f("lower",  "green", "Prezzo medio €/mq",        s => s.meanEurMq,       v => v == null ? "—" : `${fmt(v)} €/mq`),
-      f("lower",  "green", "Mediana €/mq",             s => s.medianEurMq,     v => v == null ? "—" : `${fmt(v)} €/mq`),
-      f("higher", "green", "N. transazioni",           s => s.count,           v => v == null ? "—" : fmt(v)),
-      f("higher", "green", "Volume transazioni",       s => s.volEur,          volFmt),
-      f("lower",  "green", "Trend storico → recente",  s => s.trendPct,        v => v == null ? "n.d." : `${v >= 0 ? "+" : ""}${v}%`),
-      f("lower",  "green", "Premium garage",           s => s.premiumGarage,   v => v == null ? "n.d." : `+${fmtK(v)}`),
-      f("lower",  "green", "Premium cantina",          s => s.premiumCantina,  v => v == null ? "n.d." : `+${fmtK(v)}`),
+      f("lower",  "green", "Prezzo medio €/mq",       s => s.meanEurMq,      v => v == null ? "—" : `${fmt(v)} €/mq`),
+      f("lower",  "green", "Mediana €/mq",            s => s.medianEurMq,    v => v == null ? "—" : `${fmt(v)} €/mq`),
+      f("higher", "green", "N. transazioni",          s => s.count,          v => v == null ? "—" : fmt(v)),
+      f("higher", "green", "Volume transazioni",      s => s.volEur,         volFmt),
+      f("lower",  "green", "Trend storico → recente", s => s.trendPct,       v => v == null ? "n.d." : `${v >= 0 ? "+" : ""}${v}%`),
+      f("lower",  "green", "Premium garage",          s => s.premiumGarage,  v => v == null ? "n.d." : `+${fmtEur(v)}`),
+      f("lower",  "green", "Premium cantina",         s => s.premiumCantina, v => v == null ? "n.d." : `+${fmtEur(v)}`),
       { label: "Categoria prevalente",
         values: allStats.map(s => s.catPrev),
         numericValues: allStats.map(() => null),
         better: "none", highlightColor: "green", format: v => String(v ?? "—") },
     ];
   }, [allStats]);
-
-  // ── Explanation ─────────────────────────────────────────────────────────────
 
   const spiegazione = useMemo(() => {
     if (allStats.length < 2) return null;
@@ -402,7 +352,7 @@ export default function ConfrontoContent() {
       let t = `Zona ${cheaper.zona} vs ${pricier.zona}: ${cheaper.zona} costa il ${priceDiff}% in meno (${fmt(cheaper.medianEurMq)} vs ${fmt(pricier.medianEurMq)} €/mq).`;
       t += ` ${volumeWinner.zona} ha un mercato più liquido (${fmt(volumeWinner.count)} transazioni).`;
       if (trendWinner.trendPct != null) {
-        t += ` Il trend di crescita migliore è in ${trendWinner.zona} (${trendWinner.trendPct != null && trendWinner.trendPct >= 0 ? "+" : ""}${trendWinner.trendPct}% nel periodo analizzato).`;
+        t += ` Il trend di crescita migliore è in ${trendWinner.zona} (${trendWinner.trendPct >= 0 ? "+" : ""}${trendWinner.trendPct}% nel periodo analizzato).`;
       }
       if (priceDiff >= 10 && (trendWinner.zona === cheaper.zona || cheaper.count >= pricier.count)) {
         t += ` Se cerchi valore a lungo termine, ${cheaper.zona} offre un ingresso più accessibile con potenziale di rivalutazione.`;
@@ -441,7 +391,6 @@ export default function ConfrontoContent() {
     <div className="p-4 md:p-8 max-w-[1100px] mx-auto space-y-6">
       <PageHeader />
 
-      {/* ── Zone selector + badges ── */}
       <div className="flex flex-wrap items-center gap-3">
         <ZoneMultiSelect available={zoneDisponibili} selected={selected} onToggle={toggleZone} />
         <div className="flex flex-wrap gap-2">
@@ -490,16 +439,13 @@ export default function ConfrontoContent() {
                 </thead>
                 <tbody>
                   {metrics.map((m, ri) => {
-                    const best = m.better !== "none"
-                      ? bestIndex(m.numericValues, m.better)
-                      : null;
-                    const textColor   = m.highlightColor === "red" ? "#DC2626" : "#16A34A";
-                    const bgColor     = m.highlightColor === "red" ? "rgba(239,68,68,0.07)" : "rgba(34,197,94,0.07)";
+                    const best = m.better !== "none" ? bestIndex(m.numericValues, m.better) : null;
+                    const textColor = m.highlightColor === "red" ? "#DC2626" : "#16A34A";
+                    const bgColor   = m.highlightColor === "red" ? "rgba(239,68,68,0.07)" : "rgba(34,197,94,0.07)";
                     return (
                       <tr key={ri} className="border-b border-mi-border/50 hover:bg-mi-hover/50 transition-colors">
                         <td className="px-5 py-3 text-[12px] font-medium text-mi-muted whitespace-nowrap">{m.label}</td>
                         {allStats.map((s, ci) => {
-                          const raw = m.numericValues[ci];
                           const isBest = best === ci;
                           return (
                             <td key={s.zona} className="px-5 py-3 font-medium whitespace-nowrap"
@@ -507,7 +453,7 @@ export default function ConfrontoContent() {
                                 color: isBest ? textColor : undefined,
                                 backgroundColor: isBest ? bgColor : undefined,
                               }}>
-                              {m.format(raw as number | null)}
+                              {m.format(m.numericValues[ci] as number | null)}
                             </td>
                           );
                         })}
@@ -528,45 +474,41 @@ export default function ConfrontoContent() {
               100 = migliore nella categoria · "Convenienza" invertita (costo minore = punteggio maggiore) · Premium in € via coppie comparabili
             </p>
             <div className="h-[260px] md:h-[380px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData} margin={{ top: 10, right: 40, bottom: 10, left: 40 }}>
-                <PolarGrid stroke="#EBEBEB" />
-                <PolarAngleAxis
-                  dataKey="subject"
-                  tick={{ fontSize: 11, fill: "#6F6F6F", fontWeight: 500 }}
-                />
-                <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-                <Tooltip
-                  content={({ payload, label }) => {
-                    if (!payload?.length) return null;
-                    return (
-                      <div className="bg-white border border-mi-border rounded-xl shadow-card-hover px-3 py-2.5 text-xs">
-                        <p className="font-semibold text-mi-text mb-1.5">{label}</p>
-                        {payload.map((p, i) => (
-                          <p key={i} style={{ color: colorMap[p.dataKey as string] }}>
-                            {String(p.dataKey)}: {String(p.value)}/100
-                          </p>
-                        ))}
-                      </div>
-                    );
-                  }}
-                />
-                {allStats.map((s, i) => (
-                  <Radar
-                    key={s.zona}
-                    name={s.zona}
-                    dataKey={s.zona}
-                    stroke={PALETTE[i % PALETTE.length]}
-                    fill={PALETTE[i % PALETTE.length]}
-                    fillOpacity={0.10}
-                    strokeWidth={2}
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={radarData} margin={{ top: 10, right: 40, bottom: 10, left: 40 }}>
+                  <PolarGrid stroke="#EBEBEB" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: "#6F6F6F", fontWeight: 500 }} />
+                  <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+                  <Tooltip
+                    content={({ payload, label }) => {
+                      if (!payload?.length) return null;
+                      return (
+                        <div className="bg-white border border-mi-border rounded-xl shadow-card-hover px-3 py-2.5 text-xs">
+                          <p className="font-semibold text-mi-text mb-1.5">{label}</p>
+                          {payload.map((p, i) => (
+                            <p key={i} style={{ color: colorMap[p.dataKey as string] }}>
+                              {String(p.dataKey)}: {String(p.value)}/100
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    }}
                   />
-                ))}
-              </RadarChart>
-            </ResponsiveContainer>
+                  {allStats.map((s, i) => (
+                    <Radar
+                      key={s.zona}
+                      name={s.zona}
+                      dataKey={s.zona}
+                      stroke={PALETTE[i % PALETTE.length]}
+                      fill={PALETTE[i % PALETTE.length]}
+                      fillOpacity={0.10}
+                      strokeWidth={2}
+                    />
+                  ))}
+                </RadarChart>
+              </ResponsiveContainer>
             </div>
 
-            {/* Custom legend — below chart, no overlap */}
             <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mt-4">
               {allStats.map((s, i) => (
                 <div key={s.zona} className="flex items-center gap-1.5">
@@ -582,13 +524,7 @@ export default function ConfrontoContent() {
             </div>
           </div>
 
-          {/* ── Explanation ── */}
-          {spiegazione && (
-            <div className="bg-mi-card border border-mi-border rounded-2xl p-6 shadow-card">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-mi-subtle mb-2">Analisi</p>
-              <p className="text-sm text-mi-muted leading-relaxed">{spiegazione}</p>
-            </div>
-          )}
+          {spiegazione && <AnalysisCard text={spiegazione} />}
         </>
       ) : (
         <div className="bg-mi-card rounded-2xl border border-mi-border shadow-card p-12 text-center">

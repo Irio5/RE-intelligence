@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Calculator, AlertTriangle } from "lucide-react";
+import { Calculator } from "lucide-react";
 import { parseMq, calcolaEuroMq } from "@/lib/utils/metratura";
-import { getZonaLabel, getAllZoneCodes } from "@/lib/data/zoneOMI";
-import { supabase } from "@/lib/supabase";
+import { getZonaLabel, buildZoneList } from "@/lib/data/zoneOMI";
+import { fetchAllPages } from "@/lib/utils/fetchAllPages";
+import { calcPercentile, fmt } from "@/lib/utils/stats";
+import { hasAcc } from "@/lib/utils/accessori";
+import { SELECT_STYLE } from "@/lib/utils/selectStyle";
+import { Toggle } from "@/components/ui/Toggle";
+import { AnalysisCard } from "@/components/dashboard/AnalysisCard";
+import { FormError } from "@/components/dashboard/FormError";
 
-const ZONE_ORDINATE = getAllZoneCodes();
 const TOLERANCE = 0.20; // ±20% metratura
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -37,44 +42,6 @@ type Risultato = {
   medianEurMq: number;
 };
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
-
-function hasAccessorio(v: string | boolean | null | undefined): boolean {
-  return v !== false && v !== "FALSE" && v !== "false" && v != null && v !== "";
-}
-
-function calcPercentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = (p / 100) * (sorted.length - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.ceil(idx);
-  if (lo === hi) return sorted[lo];
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
-}
-
-function fmt(n: number) { return Math.round(n).toLocaleString("it-IT"); }
-
-// ── Toggle component ──────────────────────────────────────────────────────────
-
-function Toggle({
-  value, onChange, label,
-}: { value: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <button type="button" onClick={() => onChange(!value)} className="flex items-center gap-2.5 group">
-      <div className={[
-        "relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0",
-        value ? "bg-mi-primary" : "bg-mi-hover border border-mi-border",
-      ].join(" ")}>
-        <div className={[
-          "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200",
-          value ? "translate-x-4" : "translate-x-0.5",
-        ].join(" ")} />
-      </div>
-      <span className="text-sm font-medium text-mi-text">{label}</span>
-    </button>
-  );
-}
-
 // ── Pricing bar ───────────────────────────────────────────────────────────────
 
 // 5-segment U-shape: tallest at edges (represent extremes), shortest at center
@@ -100,7 +67,6 @@ function Marker({ value, domainMin, domainMax, label, color, dashed, totalH }: M
       className="absolute flex flex-col items-center pointer-events-none"
       style={{ left: `${pct}%`, bottom: 0, transform: "translateX(-50%)", height: totalH }}
     >
-      {/* Label area */}
       <div className="text-center mb-1 px-1" style={{ height: LABEL_H - 8 }}>
         <p className="text-[10px] font-semibold whitespace-nowrap leading-tight" style={{ color }}>
           {label}
@@ -109,14 +75,12 @@ function Marker({ value, domainMin, domainMax, label, color, dashed, totalH }: M
           €&nbsp;{fmt(value)}
         </p>
       </div>
-      {/* Connector line */}
       <div
         className="flex-1 w-px"
         style={dashed
           ? { backgroundImage: `repeating-linear-gradient(to bottom, ${color} 0, ${color} 4px, transparent 4px, transparent 7px)` }
           : { backgroundColor: color }}
       />
-      {/* Dot */}
       <div className="w-2.5 h-2.5 rounded-full border-2 bg-white shrink-0" style={{ borderColor: color }} />
     </div>
   );
@@ -126,7 +90,6 @@ function Marker({ value, domainMin, domainMax, label, color, dashed, totalH }: M
 function buildTicks(min: number, max: number): number[] {
   const range = max - min;
   const rawStep = range / 5;
-  // Round step to nearest "nice" value: 5k, 10k, 20k, 25k, 50k, 100k…
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const nice = [1, 2, 2.5, 5, 10];
   const step = magnitude * (nice.find(n => n * magnitude >= rawStep) ?? 10);
@@ -136,8 +99,8 @@ function buildTicks(min: number, max: number): number[] {
   return ticks;
 }
 
-const OVERLAP_THRESHOLD_PCT = 11; // % of bar width — below this, labels overlap
-const STAGGER_PX = 30;            // extra connector height per stagger step
+const OVERLAP_THRESHOLD_PCT = 11;
+const STAGGER_PX = 30;
 
 function PricingBar({
   domainMin, domainMax,
@@ -148,7 +111,6 @@ function PricingBar({
   prezzoMinimo: number; prezzoMedio: number;
   prezzoTarget: number | null;
 }) {
-  // Build marker list with horizontal position
   const raw = [
     { value: prezzoMinimo, label: "Miglior prezzo", color: "#22C55E",  dashed: false },
     { value: prezzoMedio,  label: "Media mercato",  color: "#D4A055",  dashed: false },
@@ -161,8 +123,7 @@ function PricingBar({
     extraH: 0,
   })).sort((a, b) => a.pct - b.pct);
 
-  // Stagger overlapping markers: each marker within threshold of the previous
-  // gets an additional STAGGER_PX of connector height, pushing its label higher
+  // Stagger overlapping markers
   for (let i = 1; i < raw.length; i++) {
     if (raw[i].pct - raw[i - 1].pct < OVERLAP_THRESHOLD_PCT) {
       raw[i].extraH = raw[i - 1].extraH + STAGGER_PX;
@@ -174,9 +135,7 @@ function PricingBar({
 
   return (
     <div className="space-y-3">
-      {/* Bar + markers */}
       <div className="relative select-none" style={{ height: containerH }}>
-        {/* Markers — each with its own totalH to stagger labels */}
         {raw.map(m => (
           <Marker
             key={m.label}
@@ -195,13 +154,11 @@ function PricingBar({
           className="absolute bottom-0 left-0 right-0 flex overflow-hidden rounded-xl"
           style={{
             height: BAR_H,
-            // Gradient: green (cheap) → amber (market) → red (expensive)
             background: "linear-gradient(to right, #22C55E 0%, #85C45E 20%, #D4A055 50%, #C97040 75%, #B84C2E 100%)",
             alignItems: "flex-start",
           }}
         >
           {SEG_VIS_H.map((visH, i) => (
-            // White cover = portion hidden from top
             <div
               key={i}
               style={{
@@ -235,14 +192,12 @@ function PricingBar({
         })}
       </div>
 
-      {/* Band axis labels */}
       <div className="flex justify-between text-[10px] px-0.5">
         <span className="text-green-600 font-medium">← Conveniente</span>
         <span className="text-mi-subtle">mercato mediano</span>
         <span className="text-red-600 font-medium">Costoso →</span>
       </div>
 
-      {/* Footnote */}
       <div className="rounded-xl bg-mi-hover/60 border border-mi-border/50 px-3.5 py-2.5">
         <p className="text-[11px] text-mi-subtle leading-relaxed">
           * Le performance comprese all&apos;interno dei due rettangoli più alti sono generalmente
@@ -273,33 +228,16 @@ export default function StimaContent() {
   const [risultato, setRisultato] = useState<Risultato | null>(null);
   const [resultKey, setResultKey] = useState(0);
 
-  // Fetch all rows once
   useEffect(() => {
-    async function fetchAll() {
-      const PAGE = 1000;
-      let all: RawRow[] = [];
-      let page = 0;
-      while (true) {
-        const { data, error } = await supabase
-          .from("transazioni")
-          .select("attoid,metratura,prezzo,zonaOMI,cat,garage,cantina")
-          .range(page * PAGE, (page + 1) * PAGE - 1);
-        if (error) { setErrorMsg(error.message); setLoading(false); return; }
-        if (!data || data.length === 0) break;
-        all = all.concat(data as RawRow[]);
-        if (data.length < PAGE) break;
-        page++;
-      }
-      setRaw(all);
-      setLoading(false);
-    }
-    fetchAll();
+    fetchAllPages<RawRow>("transazioni", "attoid,metratura,prezzo,zonaOMI,cat,garage,cantina")
+      .then(({ data, error }) => {
+        if (error) setErrorMsg(error);
+        else setRaw(data);
+        setLoading(false);
+      });
   }, []);
 
-  const zoneDisponibili = useMemo(() => {
-    const dalDB = new Set(raw.map(r => r.zonaOMI));
-    return Array.from(new Set([...ZONE_ORDINATE, ...dalDB])).sort();
-  }, [raw]);
+  const zoneDisponibili = useMemo(() => buildZoneList(raw), [raw]);
 
   const categorieDisponibili = useMemo(() => {
     const cats = new Set(raw.map(r => r.cat).filter(Boolean));
@@ -329,7 +267,6 @@ export default function StimaContent() {
     if (!inputMq) { setFormError("Inserisci la metratura in mq."); return; }
     setFormError(null);
 
-    // Find comparable transactions
     const compEurMq: number[] = [];
     for (const r of raw) {
       if (r.zonaOMI !== zona || r.cat !== cat) continue;
@@ -367,8 +304,8 @@ export default function StimaContent() {
       if (!mq || mq <= 0) continue;
       const eurMq = calcolaEuroMq(r.prezzo, mq);
       if (eurMq < 500 || eurMq > 10000) continue;
-      if (hasAccessorio(r.garage)) wGarage.push(eurMq); else woGarage.push(eurMq);
-      if (hasAccessorio(r.cantina)) wCantina.push(eurMq); else woCantina.push(eurMq);
+      if (hasAcc(r.garage)) wGarage.push(eurMq); else woGarage.push(eurMq);
+      if (hasAcc(r.cantina)) wCantina.push(eurMq); else woCantina.push(eurMq);
     }
 
     let premiumGarage: number | null = null;
@@ -385,7 +322,6 @@ export default function StimaContent() {
       premiumCantina = Math.round(((medWC - medWoC) / medWoC) * 100);
     }
 
-    // Apply accessories premium to estimated price
     let prezzoStimato = Math.round(p50 * inputMq);
     if (hasGarage  && premiumGarage  !== null) prezzoStimato = Math.round(prezzoStimato * (1 + premiumGarage  / 100));
     if (hasCantina && premiumCantina !== null) prezzoStimato = Math.round(prezzoStimato * (1 + premiumCantina / 100));
@@ -430,14 +366,6 @@ export default function StimaContent() {
     return t.trim();
   }
 
-  // ── Select style helper ───────────────────────────────────────────────────────
-
-  const selectStyle = {
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F6F6F' stroke-width='1.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat" as const,
-    backgroundPosition: "right 10px center",
-  };
-
   // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) return (
@@ -455,7 +383,6 @@ export default function StimaContent() {
     </div>
   );
 
-  // Bar domain: from min comp price with 5% padding, to max of (max comp or target) with 5% padding
   const barMin = risultato ? Math.round(risultato.prezzoBar.min * 0.95) : 0;
   const barMax = risultato
     ? Math.round(Math.max(risultato.prezzoBar.max, targetPrice ?? 0) * 1.05)
@@ -469,7 +396,6 @@ export default function StimaContent() {
       <div className="bg-mi-card rounded-2xl border border-mi-border shadow-card p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
 
-          {/* Zona OMI */}
           <div className="sm:col-span-2">
             <label className="block text-[12px] font-semibold text-mi-muted uppercase tracking-wider mb-1.5">
               Zona OMI
@@ -479,7 +405,7 @@ export default function StimaContent() {
               onChange={e => setZona(e.target.value)}
               className="w-full h-10 px-3 pr-8 rounded-lg border border-mi-border bg-white text-sm font-medium text-mi-text
                          appearance-none focus:outline-none focus:ring-2 focus:ring-mi-primary/20 focus:border-mi-primary transition-colors cursor-pointer"
-              style={selectStyle}
+              style={SELECT_STYLE}
             >
               {zoneDisponibili.map(z => (
                 <option key={z} value={z}>{getZonaLabel(z)}</option>
@@ -487,18 +413,14 @@ export default function StimaContent() {
             </select>
           </div>
 
-          {/* Metratura */}
           <div>
             <label className="block text-[12px] font-semibold text-mi-muted uppercase tracking-wider mb-1.5">
               Metratura
             </label>
             <div className="relative">
               <input
-                type="number"
-                min="10"
-                max="1000"
-                value={mqInput}
-                onChange={e => setMqInput(e.target.value)}
+                type="number" min="10" max="1000"
+                value={mqInput} onChange={e => setMqInput(e.target.value)}
                 placeholder="es. 70"
                 className="w-full h-10 pl-3 pr-10 rounded-lg border border-mi-border bg-white text-sm font-medium text-mi-text
                            placeholder:text-mi-subtle focus:outline-none focus:ring-2 focus:ring-mi-primary/20 focus:border-mi-primary transition-colors"
@@ -507,17 +429,15 @@ export default function StimaContent() {
             </div>
           </div>
 
-          {/* Categoria catastale */}
           <div>
             <label className="block text-[12px] font-semibold text-mi-muted uppercase tracking-wider mb-1.5">
               Categoria catastale
             </label>
             <select
-              value={cat}
-              onChange={e => setCat(e.target.value)}
+              value={cat} onChange={e => setCat(e.target.value)}
               className="w-full h-10 px-3 pr-8 rounded-lg border border-mi-border bg-white text-sm font-medium text-mi-text
                          appearance-none focus:outline-none focus:ring-2 focus:ring-mi-primary/20 focus:border-mi-primary transition-colors cursor-pointer"
-              style={selectStyle}
+              style={SELECT_STYLE}
             >
               {categorieDisponibili.length > 0
                 ? categorieDisponibili.map(c => <option key={c} value={c}>{c}</option>)
@@ -525,17 +445,13 @@ export default function StimaContent() {
             </select>
           </div>
 
-          {/* Garage */}
           <div className="flex items-center h-10">
             <Toggle value={hasGarage} onChange={setHasGarage} label="Garage incluso" />
           </div>
-
-          {/* Cantina */}
           <div className="flex items-center h-10">
             <Toggle value={hasCantina} onChange={setHasCantina} label="Cantina inclusa" />
           </div>
 
-          {/* Prezzo target (optional) */}
           <div className="sm:col-span-2">
             <label className="block text-[12px] font-semibold text-mi-muted uppercase tracking-wider mb-1.5">
               Prezzo richiesto <span className="normal-case font-normal text-mi-subtle">(opzionale — per visualizzarlo sulla barra)</span>
@@ -543,10 +459,8 @@ export default function StimaContent() {
             <div className="relative max-w-[200px]">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-mi-subtle pointer-events-none">€</span>
               <input
-                type="text"
-                inputMode="numeric"
-                value={targetInput}
-                onChange={e => setTargetInput(e.target.value)}
+                type="text" inputMode="numeric"
+                value={targetInput} onChange={e => setTargetInput(e.target.value)}
                 placeholder="es. 320000"
                 className="w-full h-10 pl-7 pr-3 rounded-lg border border-mi-border bg-white text-sm font-medium text-mi-text
                            placeholder:text-mi-subtle focus:outline-none focus:ring-2 focus:ring-mi-primary/20 focus:border-mi-primary transition-colors"
@@ -555,15 +469,8 @@ export default function StimaContent() {
           </div>
         </div>
 
-        {/* Error */}
-        {formError && (
-          <div className="mt-4 flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-            <AlertTriangle size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" />
-            <span>{formError}</span>
-          </div>
-        )}
+        <FormError message={formError} />
 
-        {/* Submit */}
         <div className="mt-5">
           <button
             onClick={handleCalcola}
@@ -581,7 +488,6 @@ export default function StimaContent() {
       {risultato && (
         <div key={resultKey} className="space-y-5 animate-fade-in-up">
 
-          {/* Prezzo stimato card */}
           <div className="bg-mi-card rounded-2xl border border-mi-border shadow-card p-6">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-mi-subtle mb-3">
               Prezzo stimato
@@ -600,7 +506,6 @@ export default function StimaContent() {
               {fmt(risultato.medianEurMq)} €/mq mediana
             </p>
 
-            {/* Premium badges */}
             {(risultato.hasGarage || risultato.hasCantina) && (
               <div className="flex flex-wrap gap-2 mt-4">
                 {risultato.hasGarage && risultato.premiumGarage !== null && (
@@ -617,7 +522,6 @@ export default function StimaContent() {
             )}
           </div>
 
-          {/* Pricing bar card */}
           <div className="bg-mi-card rounded-2xl border border-mi-border shadow-card p-6">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-mi-subtle mb-5">
               Posizionamento sul mercato
@@ -631,15 +535,7 @@ export default function StimaContent() {
             />
           </div>
 
-          {/* Explanation card */}
-          <div className="bg-mi-card border border-mi-border rounded-2xl p-6 shadow-card">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-mi-subtle mb-2">
-              Analisi
-            </p>
-            <p className="text-sm text-mi-muted leading-relaxed">
-              {buildSpiegazione(risultato)}
-            </p>
-          </div>
+          <AnalysisCard text={buildSpiegazione(risultato)} />
         </div>
       )}
     </div>

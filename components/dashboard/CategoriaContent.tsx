@@ -7,10 +7,12 @@ import {
 } from "recharts";
 import { Tag, BookOpen } from "lucide-react";
 import { parseMq, calcolaEuroMq } from "@/lib/utils/metratura";
-import { getZonaLabel, getAllZoneCodes } from "@/lib/data/zoneOMI";
-import { supabase } from "@/lib/supabase";
+import { getZonaLabel, buildZoneList } from "@/lib/data/zoneOMI";
+import { fetchAllPages } from "@/lib/utils/fetchAllPages";
+import { calcPercentile, fmt, fmtEur } from "@/lib/utils/stats";
+import { SELECT_STYLE } from "@/lib/utils/selectStyle";
+import { AnalysisCard } from "@/components/dashboard/AnalysisCard";
 
-const ZONE_ORDINATE = getAllZoneCodes();
 const MIN_TX = 3;
 
 // ── Fiscal estimates for 70mq in Milan (indicative) ───────────────────────────
@@ -20,8 +22,6 @@ const FISCAL: Record<string, { min: number; max: number }> = {
   A03: { min: 1200, max: 1600 },
   A04: { min: 800,  max: 1100 },
 };
-
-// ── Category labels ───────────────────────────────────────────────────────────
 
 const CAT_LABEL: Record<string, string> = {
   A01: "A/1 · Signorile",
@@ -58,27 +58,14 @@ function catColor(rank: number, total: number): string {
 type RawRow = { metratura: string; prezzo: number; zonaOMI: string; cat: string };
 
 type CatStat = {
-  cat:    string;
-  mean:   number;
-  median: number;
-  count:  number;
-  pct:    number;
-  diffPct: number | null; // vs cheapest
-  color:  string;
+  cat:     string;
+  mean:    number;
+  median:  number;
+  count:   number;
+  pct:     number;
+  diffPct: number | null;
+  color:   string;
 };
-
-// ── Utilities ─────────────────────────────────────────────────────────────────
-
-function calcPercentile(sorted: number[], p: number): number {
-  if (!sorted.length) return 0;
-  const idx = (p / 100) * (sorted.length - 1);
-  const lo = Math.floor(idx), hi = Math.ceil(idx);
-  if (lo === hi) return sorted[lo];
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
-}
-
-function fmt(n: number) { return Math.round(n).toLocaleString("it-IT"); }
-function fmtK(n: number) { return `€\u202f${fmt(n)}`; }
 
 // ── Custom bar labels ─────────────────────────────────────────────────────────
 
@@ -86,8 +73,7 @@ function fmtK(n: number) { return `€\u202f${fmt(n)}`; }
 function CountLabel({ x, y, width, value }: any) {
   if (!value || !x || !y || !width) return null;
   return (
-    <text x={x + width / 2} y={y - 22} textAnchor="middle"
-      fill="#6F6F6F" fontSize={10} fontFamily="var(--font-sans,sans-serif)">
+    <text x={x + width / 2} y={y - 22} textAnchor="middle" fill="#6F6F6F" fontSize={10} fontFamily="var(--font-sans,sans-serif)">
       {value} tx
     </text>
   );
@@ -97,23 +83,18 @@ function CountLabel({ x, y, width, value }: any) {
 function DiffLabel({ x, y, width, value }: any) {
   if (!value || !x || !y || !width) return null;
   return (
-    <text x={x + width / 2} y={y - 10} textAnchor="middle"
-      fill="#1C1917" fontSize={11} fontWeight={700} fontFamily="var(--font-sans,sans-serif)">
+    <text x={x + width / 2} y={y - 10} textAnchor="middle" fill="#1C1917" fontSize={11} fontWeight={700} fontFamily="var(--font-sans,sans-serif)">
       {value}
     </text>
   );
 }
-
-// ── Page header ───────────────────────────────────────────────────────────────
 
 function PageHeader({ loading }: { loading?: boolean }) {
   return (
     <div>
       <div className="flex items-center gap-2.5 mb-1.5">
         <Tag size={20} strokeWidth={1.5} className="text-mi-primary" />
-        <h1 className="text-[22px] font-semibold text-mi-text tracking-[-0.02em]">
-          Impatto categoria catastale
-        </h1>
+        <h1 className="text-[22px] font-semibold text-mi-text tracking-[-0.02em]">Impatto categoria catastale</h1>
       </div>
       <p className="text-sm text-mi-muted">
         {loading ? "Caricamento dati in corso…" : "Come la categoria catastale (A/2, A/3, A/4…) influenza prezzo e tasse."}
@@ -130,7 +111,6 @@ function SezioneDidattica() {
     { code: "A/3", name: "Economica", color: "#D4A055", text: "Standard. Rendita media → tasse nella norma." },
     { code: "A/4", name: "Popolare",  color: "#22C55E", text: "Livello base. Rendita bassa → tasse più basse." },
   ];
-
   return (
     <div className="bg-[#FDFCFA] border border-mi-border rounded-2xl p-6 shadow-card">
       <div className="flex items-center gap-2.5 mb-3">
@@ -143,10 +123,7 @@ function SezioneDidattica() {
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {cats.map(c => (
-          <div key={c.code}
-            className="rounded-xl border border-mi-border bg-white p-4"
-            style={{ borderLeftWidth: 3, borderLeftColor: c.color }}
-          >
+          <div key={c.code} className="rounded-xl border border-mi-border bg-white p-4" style={{ borderLeftWidth: 3, borderLeftColor: c.color }}>
             <p className="text-[12px] font-bold mb-0.5" style={{ color: c.color }}>{c.code} · {c.name}</p>
             <p className="text-[12px] text-mi-muted leading-snug">{c.text}</p>
           </div>
@@ -160,8 +137,7 @@ function SezioneDidattica() {
 
 function TabellaFiscale({ stats }: { stats: CatStat[] }) {
   const rows = ["A02", "A03", "A04"].map(code => ({
-    code,
-    label:  CAT_LABEL[code] ?? code,
+    code, label: CAT_LABEL[code] ?? code,
     stat:   stats.find(s => s.cat === code) ?? null,
     fiscal: FISCAL[code],
   })).filter(r => r.fiscal);
@@ -169,6 +145,7 @@ function TabellaFiscale({ stats }: { stats: CatStat[] }) {
   if (rows.filter(r => r.stat).length < 2) return null;
 
   const cheapestPrice = rows.reduce((min, r) => r.stat && r.stat.mean < min ? r.stat.mean : min, Infinity);
+  const cheapFiscal   = FISCAL["A04"] ? Math.round((FISCAL["A04"].min + FISCAL["A04"].max) / 2) : 0;
 
   return (
     <div className="bg-mi-card rounded-2xl border border-mi-border shadow-card overflow-hidden">
@@ -190,14 +167,10 @@ function TabellaFiscale({ stats }: { stats: CatStat[] }) {
           </thead>
           <tbody>
             {rows.map(({ code, label, stat, fiscal }) => {
-              const priceDiff = stat && isFinite(cheapestPrice)
-                ? Math.round(((stat.mean - cheapestPrice) / cheapestPrice) * 100)
-                : null;
+              const priceDiff  = stat && isFinite(cheapestPrice) ? Math.round(((stat.mean - cheapestPrice) / cheapestPrice) * 100) : null;
               const fiscalMid  = Math.round((fiscal.min + fiscal.max) / 2);
-              const cheapFiscal = FISCAL["A04"] ? Math.round((FISCAL["A04"].min + FISCAL["A04"].max) / 2) : 0;
-              const extraTasse  = (fiscalMid - cheapFiscal) * 10;
-              const isBase = code === "A04";
-
+              const extraTasse = (fiscalMid - cheapFiscal) * 10;
+              const isBase     = code === "A04";
               return (
                 <tr key={code} className="border-b border-mi-border/40 hover:bg-mi-hover/50 transition-colors">
                   <td className="px-5 py-3.5 font-semibold text-mi-text">{label}</td>
@@ -205,25 +178,17 @@ function TabellaFiscale({ stats }: { stats: CatStat[] }) {
                     {stat ? `${fmt(stat.mean)} €/mq` : <span className="text-mi-subtle">n.d.</span>}
                   </td>
                   <td className="px-5 py-3.5 text-right font-semibold">
-                    {isBase
-                      ? <span className="text-mi-subtle">—</span>
+                    {isBase ? <span className="text-mi-subtle">—</span>
                       : priceDiff != null
-                        ? <span style={{ color: priceDiff > 0 ? "#B84C2E" : "#22C55E" }}>
-                            {priceDiff > 0 ? "+" : ""}{priceDiff}%
-                          </span>
-                        : <span className="text-mi-subtle">n.d.</span>
-                    }
+                        ? <span style={{ color: priceDiff > 0 ? "#B84C2E" : "#22C55E" }}>{priceDiff > 0 ? "+" : ""}{priceDiff}%</span>
+                        : <span className="text-mi-subtle">n.d.</span>}
                   </td>
-                  <td className="px-5 py-3.5 text-right text-mi-muted">
-                    {fmtK(fiscal.min)}–{fmtK(fiscal.max)}
-                  </td>
+                  <td className="px-5 py-3.5 text-right text-mi-muted">{fmtEur(fiscal.min)}–{fmtEur(fiscal.max)}</td>
                   <td className="px-5 py-3.5 text-right font-semibold">
-                    {isBase
-                      ? <span className="text-mi-subtle">—</span>
+                    {isBase ? <span className="text-mi-subtle">—</span>
                       : extraTasse > 0
-                        ? <span className="text-[#B84C2E]">+{fmtK(extraTasse)}</span>
-                        : <span className="text-mi-subtle">—</span>
-                    }
+                        ? <span className="text-[#B84C2E]">+{fmtEur(extraTasse)}</span>
+                        : <span className="text-mi-subtle">—</span>}
                   </td>
                 </tr>
               );
@@ -249,33 +214,15 @@ export default function CategoriaContent() {
   const [zona, setZona]         = useState("C16");
 
   useEffect(() => {
-    async function fetchAll() {
-      const PAGE = 1000;
-      let all: RawRow[] = [];
-      let page = 0;
-      while (true) {
-        const { data, error } = await supabase
-          .from("transazioni")
-          .select("metratura,prezzo,zonaOMI,cat")
-          .range(page * PAGE, (page + 1) * PAGE - 1);
-        if (error) { setErrorMsg(error.message); setLoading(false); return; }
-        if (!data || data.length === 0) break;
-        all = all.concat(data as RawRow[]);
-        if (data.length < PAGE) break;
-        page++;
-      }
-      setRaw(all);
-      setLoading(false);
-    }
-    fetchAll();
+    fetchAllPages<RawRow>("transazioni", "metratura,prezzo,zonaOMI,cat")
+      .then(({ data, error }) => {
+        if (error) setErrorMsg(error);
+        else setRaw(data);
+        setLoading(false);
+      });
   }, []);
 
-  const zoneDisponibili = useMemo(() => {
-    const dalDB = new Set(raw.map(r => r.zonaOMI));
-    return Array.from(new Set([...ZONE_ORDINATE, ...dalDB])).sort();
-  }, [raw]);
-
-  // ── Compute stats per category ────────────────────────────────────────────
+  const zoneDisponibili = useMemo(() => buildZoneList(raw), [raw]);
 
   const catStats: CatStat[] = useMemo(() => {
     const acc: Record<string, number[]> = {};
@@ -288,7 +235,6 @@ export default function CategoriaContent() {
       if (!acc[r.cat]) acc[r.cat] = [];
       acc[r.cat].push(eurMq);
     }
-
     const total = Object.values(acc).reduce((s, v) => s + v.length, 0);
     const entries = Object.entries(acc)
       .filter(([, v]) => v.length >= MIN_TX)
@@ -297,9 +243,7 @@ export default function CategoriaContent() {
         return { cat, mean: vals.reduce((s, v) => s + v, 0) / vals.length, median: calcPercentile(sorted, 50), count: vals.length };
       })
       .sort((a, b) => a.mean - b.mean);
-
     const cheapestMean = entries[0]?.mean ?? 0;
-
     return entries.map((e, i) => ({
       ...e,
       pct:     total > 0 ? Math.round((e.count / total) * 1000) / 10 : 0,
@@ -308,24 +252,9 @@ export default function CategoriaContent() {
     }));
   }, [raw, zona]);
 
-  // ── Chart data ────────────────────────────────────────────────────────────
-
-  const barData = catStats.map(s => ({
-    name:    catLabel(s.cat).split(" · ")[0],  // short label for axis
-    mean:    Math.round(s.mean),
-    count:   s.count,
-    diffLbl: s.diffPct != null ? `+${s.diffPct}%` : "base",
-    color:   s.color,
-  }));
-
-  const distData = catStats.map(s => ({
-    name:  catLabel(s.cat).split(" · ")[0],
-    pct:   s.pct,
-    count: s.count,
-    color: s.color,
-  }));
-
-  // ── Explanation ───────────────────────────────────────────────────────────
+  const barData  = catStats.map(s => ({ name: catLabel(s.cat).split(" · ")[0], mean: Math.round(s.mean), count: s.count, diffLbl: s.diffPct != null ? `+${s.diffPct}%` : "base", color: s.color }));
+  const distData = catStats.map(s => ({ name: catLabel(s.cat).split(" · ")[0], pct: s.pct, count: s.count, color: s.color }));
+  const yMax     = barData.length > 0 ? Math.ceil(Math.max(...barData.map(d => d.mean)) * 1.3 / 500) * 500 : 6000;
 
   const spiegazione = useMemo(() => {
     if (catStats.length < 2) return null;
@@ -333,9 +262,7 @@ export default function CategoriaContent() {
     const cheapest  = catStats[0];
     const a2 = catStats.find(s => s.cat === "A02");
     const a3 = catStats.find(s => s.cat === "A03");
-
     let t = `In zona ${zona}, la categoria più diffusa è ${catLabel(prevalent.cat)} con ${prevalent.pct}% delle transazioni. `;
-
     if (a2 && a3) {
       const diff = Math.round(((a2.mean - a3.mean) / a3.mean) * 100);
       t += `Un A/2 costa in media ${fmt(a2.mean)} €/mq contro ${fmt(a3.mean)} €/mq di un A/3: paghi il ${Math.abs(diff)}% ${diff > 0 ? "in più" : "in meno"} all'acquisto. `;
@@ -346,21 +273,8 @@ export default function CategoriaContent() {
       const diff = Math.round(((priciest.mean - cheapest.mean) / cheapest.mean) * 100);
       t += `La categoria più cara (${catLabel(priciest.cat)}) costa il ${diff}% in più rispetto alla più economica (${catLabel(cheapest.cat)}).`;
     }
-
     return t;
   }, [catStats, zona]);
-
-  // ── Select style ──────────────────────────────────────────────────────────
-
-  const selStyle = {
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F6F6F' stroke-width='1.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat" as const,
-    backgroundPosition: "right 10px center",
-  };
-
-  const yMax = barData.length > 0
-    ? Math.ceil(Math.max(...barData.map(d => d.mean)) * 1.3 / 500) * 500
-    : 6000;
 
   if (loading)  return <div className="p-4 md:p-8 max-w-[900px] mx-auto"><PageHeader loading /></div>;
   if (errorMsg) return (
@@ -374,18 +288,15 @@ export default function CategoriaContent() {
     <div className="p-4 md:p-8 max-w-[900px] mx-auto space-y-6">
       <PageHeader />
 
-      {/* ── Filter ── */}
       <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-mi-muted whitespace-nowrap">Zona OMI</label>
         <select value={zona} onChange={e => setZona(e.target.value)}
-          className="h-9 px-3 pr-8 rounded-lg border border-mi-border bg-mi-card text-sm font-medium text-mi-text
-                     appearance-none focus:outline-none focus:ring-2 focus:ring-mi-primary/20 focus:border-mi-primary transition-colors cursor-pointer"
-          style={selStyle}>
+          className="h-9 px-3 pr-8 rounded-lg border border-mi-border bg-mi-card text-sm font-medium text-mi-text appearance-none focus:outline-none focus:ring-2 focus:ring-mi-primary/20 focus:border-mi-primary transition-colors cursor-pointer"
+          style={SELECT_STYLE}>
           {zoneDisponibili.map(z => <option key={z} value={z}>{getZonaLabel(z)}</option>)}
         </select>
       </div>
 
-      {/* ── Didactic section ── */}
       <SezioneDidattica />
 
       {catStats.length < 2 ? (
@@ -394,58 +305,47 @@ export default function CategoriaContent() {
         </div>
       ) : (
         <>
-          {/* ── Price bar chart ── */}
           <div className="bg-mi-card rounded-2xl border border-mi-border shadow-card p-6">
-            <p className="text-[11px] font-semibold text-mi-subtle uppercase tracking-widest mb-1">
-              Prezzo medio €/mq per categoria
-            </p>
-            <p className="text-[12px] text-mi-subtle mb-5">
-              Etichetta superiore = differenza % rispetto alla categoria più economica
-            </p>
+            <p className="text-[11px] font-semibold text-mi-subtle uppercase tracking-widest mb-1">Prezzo medio €/mq per categoria</p>
+            <p className="text-[12px] text-mi-subtle mb-5">Etichetta superiore = differenza % rispetto alla categoria più economica</p>
             <div className="h-[220px] md:h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData} margin={{ top: 44, right: 20, bottom: 8, left: 16 }} barCategoryGap="35%">
-                <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#4A4A48", fontWeight: 500 }} tickLine={false} axisLine={{ stroke: "#EBEBEB" }} />
-                <YAxis domain={[0, yMax]} tick={{ fontSize: 11, fill: "#9E9E9E" }} tickLine={false} axisLine={false}
-                  width={60} tickFormatter={v => `${(v / 1000).toFixed(1)}k`} />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = payload[0].payload;
-                    return (
-                      <div className="bg-white border border-mi-border rounded-xl shadow-card-hover px-4 py-3 text-sm">
-                        <p className="font-semibold text-mi-text mb-1">{d.name}</p>
-                        <p className="font-bold text-mi-text">{fmt(d.mean)} €/mq</p>
-                        <p className="text-mi-subtle text-[12px]">{d.count} transazioni</p>
-                        {d.diffLbl !== "base" && <p className="text-[12px] font-semibold text-[#B84C2E]">{d.diffLbl} vs più economica</p>}
-                      </div>
-                    );
-                  }}
-                  cursor={{ fill: "rgba(184,76,46,0.04)" }}
-                />
-                <Bar dataKey="mean" radius={[6, 6, 0, 0]} isAnimationActive={false} maxBarSize={100}>
-                  {barData.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={0.88} />)}
-                  <LabelList dataKey="count" position="top" content={CountLabel} />
-                  <LabelList dataKey="diffLbl" position="top" content={DiffLabel} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData} margin={{ top: 44, right: 20, bottom: 8, left: 16 }} barCategoryGap="35%">
+                  <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#4A4A48", fontWeight: 500 }} tickLine={false} axisLine={{ stroke: "#EBEBEB" }} />
+                  <YAxis domain={[0, yMax]} tick={{ fontSize: 11, fill: "#9E9E9E" }} tickLine={false} axisLine={false} width={60} tickFormatter={v => `${(v / 1000).toFixed(1)}k`} />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload;
+                      return (
+                        <div className="bg-white border border-mi-border rounded-xl shadow-card-hover px-4 py-3 text-sm">
+                          <p className="font-semibold text-mi-text mb-1">{d.name}</p>
+                          <p className="font-bold text-mi-text">{fmt(d.mean)} €/mq</p>
+                          <p className="text-mi-subtle text-[12px]">{d.count} transazioni</p>
+                          {d.diffLbl !== "base" && <p className="text-[12px] font-semibold text-[#B84C2E]">{d.diffLbl} vs più economica</p>}
+                        </div>
+                      );
+                    }}
+                    cursor={{ fill: "rgba(184,76,46,0.04)" }}
+                  />
+                  <Bar dataKey="mean" radius={[6,6,0,0]} isAnimationActive={false} maxBarSize={100}>
+                    {barData.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={0.88} />)}
+                    <LabelList dataKey="count"   position="top" content={CountLabel} />
+                    <LabelList dataKey="diffLbl" position="top" content={DiffLabel} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          {/* ── Distribution chart ── */}
           <div className="bg-mi-card rounded-2xl border border-mi-border shadow-card p-6">
-            <p className="text-[11px] font-semibold text-mi-subtle uppercase tracking-widest mb-5">
-              Distribuzione transazioni per categoria (%)
-            </p>
+            <p className="text-[11px] font-semibold text-mi-subtle uppercase tracking-widest mb-5">Distribuzione transazioni per categoria (%)</p>
             <ResponsiveContainer width="100%" height={Math.max(120, distData.length * 44)}>
               <BarChart data={distData} layout="vertical" margin={{ top: 0, right: 60, bottom: 0, left: 80 }}>
                 <CartesianGrid strokeDasharray="0" stroke="#F0F0F0" horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: "#9E9E9E" }} tickLine={false}
-                  axisLine={false} tickFormatter={v => `${v}%`} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: "#4A4A48", fontWeight: 500 }}
-                  tickLine={false} axisLine={false} width={75} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: "#9E9E9E" }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: "#4A4A48", fontWeight: 500 }} tickLine={false} axisLine={false} width={75} />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
@@ -460,7 +360,7 @@ export default function CategoriaContent() {
                   }}
                   cursor={{ fill: "rgba(184,76,46,0.04)" }}
                 />
-                <Bar dataKey="pct" radius={[0, 6, 6, 0]} isAnimationActive={false} maxBarSize={28}>
+                <Bar dataKey="pct" radius={[0,6,6,0]} isAnimationActive={false} maxBarSize={28}>
                   {distData.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={0.85} />)}
                   <LabelList dataKey="pct" position="right"
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -472,16 +372,9 @@ export default function CategoriaContent() {
             </ResponsiveContainer>
           </div>
 
-          {/* ── Fiscal table ── */}
           <TabellaFiscale stats={catStats} />
 
-          {/* ── Explanation ── */}
-          {spiegazione && (
-            <div className="bg-mi-card border border-mi-border rounded-2xl p-6 shadow-card">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-mi-subtle mb-2">Analisi</p>
-              <p className="text-sm text-mi-muted leading-relaxed">{spiegazione}</p>
-            </div>
-          )}
+          {spiegazione && <AnalysisCard text={spiegazione} />}
         </>
       )}
     </div>
