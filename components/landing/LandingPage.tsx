@@ -152,7 +152,7 @@ export default function LandingPage() {
           className="absolute inset-0 hidden md:block"
           style={{
             backgroundImage: `url("/images/Brera_House.webp")`,
-            backgroundSize: "100%",
+            backgroundSize: "120%",
             backgroundPosition: "center 0%",
           }}
         />
